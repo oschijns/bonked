@@ -1,0 +1,11 @@
+[package]
+name = "bonked2d"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hecs = { version = "0.10", default-features = false, features = ["macros"] }
+parry2d = { version = "0.17", default-features = false, features = [
+    "required-features",
+    "alloc",
+] }

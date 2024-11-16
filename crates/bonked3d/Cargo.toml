@@ -1,0 +1,20 @@
+[package]
+name = "bonked3d"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["std"]
+
+# enable support for the standard library
+std = []
+
+[dependencies]
+hecs = { version = "0.10", default-features = false, features = ["macros"] }
+parry3d = { version = "0.17", default-features = false, features = [
+    "required-features",
+    "alloc",
+] }
+hashbrown = { version = "0.15", default-features = false, features = [
+    "default-hasher",
+] }

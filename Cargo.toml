@@ -1,0 +1,9 @@
+[workspace]
+members = ["crates/bonked2d", "crates/bonked3d"]
+
+[workspace.package]
+name = "bonked"
+description = "A really simple physics engine intended for making games on embedded systems"
+authors = ["Olivier Schyns <https://github.com/oschijns>"]
+version = "0.1.0"
+edition = "2021"
