@@ -2,7 +2,7 @@ use crate::{
     BoundingBox, Collider, CollisionStatus, Gravity, NextPosition, NextVelocity, Position, Velocity,
 };
 use hecs::{PreparedQuery, Without, World};
-use parry3d::{bounding_volume::BoundingVolume, math::Real, query::contact};
+use parry2d::{bounding_volume::BoundingVolume, math::Real, query::contact};
 
 /// Query format for processing kinematic on kinematic collisions
 type ProcessKinematics<'q, A> = PreparedQuery<(

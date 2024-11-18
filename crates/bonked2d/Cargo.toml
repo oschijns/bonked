@@ -3,6 +3,12 @@ name = "bonked2d"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["std"]
+
+# enable support for the standard library
+std = []
+
 [dependencies]
 hecs = { version = "0.10", default-features = false, features = ["macros"] }
 parry2d = { version = "0.17", default-features = false, features = [

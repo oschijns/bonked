@@ -1,5 +1,5 @@
 use crate::Position;
-use parry3d::math::{Isometry, Real, Translation, Vector};
+use parry2d::math::{Isometry, Real, Translation, Vector};
 
 impl Position {
     /// Get the end-point of
@@ -13,5 +13,5 @@ impl Position {
 /// Check if the Vector is null
 #[inline]
 pub(crate) fn is_null(vec: &Vector<Real>) -> bool {
-    vec.x == 0.0 && vec.y == 0.0 && vec.z == 0.0
+    vec.x == 0.0 && vec.y == 0.0
 }

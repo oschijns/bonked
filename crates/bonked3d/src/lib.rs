@@ -1,7 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[macro_use]
 extern crate alloc;
+
+/// Accumulator for contact processing
+pub mod accumulator;
 
 /// Math functions
 pub mod math;
@@ -9,10 +11,11 @@ pub mod math;
 /// Systems for processing objects
 pub mod system;
 
-use alloc::sync::Arc;
+use accumulator::Accumulator;
+use alloc::{boxed::Box, sync::Arc};
 use parry3d::{
     bounding_volume::Aabb,
-    math::{Isometry, Point, Real, UnitVector, Vector},
+    math::{Isometry, Real, Vector},
     shape::Shape,
 };
 
@@ -20,12 +23,15 @@ use parry3d::{
 pub type Mask = u32;
 
 /// Collider of the object
-pub struct Collider {
+pub struct Collider<A> {
     /// Collision shape
     pub shape: Arc<dyn Shape>,
 
     /// Collision mask
     pub mask: Mask,
+
+    /// Attributes
+    pub attributes: A,
 }
 
 /// Current position of the object for this tick
@@ -47,13 +53,4 @@ pub struct BoundingBox(pub Aabb);
 pub struct Gravity(pub Vector<Real>);
 
 /// Collision state
-pub struct CollisionStatus(pub Box<dyn Accumulator>);
-
-/// Collision accumulator
-pub trait Accumulator: Send + Sync {
-    /// Add the contact point and normal to this accumulator
-    fn add_contact(&mut self, point: &Point<Real>, normal: &UnitVector<Real>);
-
-    /// Add the velocity of the other object to this accumulator
-    fn add_velocity(&mut self, velocity: &Vector<Real>);
-}
+pub struct CollisionStatus<A>(pub Box<dyn Accumulator<A>>);
