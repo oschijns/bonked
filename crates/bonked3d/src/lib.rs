@@ -27,6 +27,9 @@ pub struct Collider<A> {
     /// Collision shape
     pub shape: Arc<dyn Shape>,
 
+    /// Collision layer
+    pub layer: Mask,
+
     /// Collision mask
     pub mask: Mask,
 

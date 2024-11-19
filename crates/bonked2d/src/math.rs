@@ -1,5 +1,13 @@
-use crate::Position;
+use crate::{Collider, Position};
 use parry2d::math::{Isometry, Real, Translation, Vector};
+
+impl<A> Collider<A> {
+    /// Check if the collision layer of the first object match the one of the second
+    #[inline]
+    pub fn can_collide_with(&self, other: &Self) -> bool {
+        (self.layer & other.mask) != 0
+    }
+}
 
 impl Position {
     /// Get the end-point of
