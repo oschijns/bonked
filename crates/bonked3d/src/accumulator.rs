@@ -7,7 +7,7 @@ use parry3d::{
 /// Collision accumulator
 pub trait Accumulator<A>: Send + Sync {
     /// Reset the accumulator for a new tick
-    fn reset(&mut self);
+    fn reset(&mut self, current_position: &Isometry<Real>, current_velocity: &Vector<Real>);
 
     /// Add the contact point and normal to this accumulator
     fn add_contact(&mut self, point: &Point<Real>, normal: &UnitVector<Real>, attributes: &A);
@@ -53,10 +53,10 @@ pub struct DefaultAccumulator {
 
 impl DefaultAccumulator {
     /// Create a new accumulator with the provided shape radius
-    pub fn new(radius: Real, rotation: UnitQuaternion<Real>) -> Self {
+    pub fn new(radius: Real) -> Self {
         Self {
             radius,
-            rotation,
+            rotation: Default::default(),
             position: Default::default(),
             normal: Default::default(),
             count: 0,
@@ -66,7 +66,8 @@ impl DefaultAccumulator {
 
 impl<A> Accumulator<A> for DefaultAccumulator {
     /// Reset the accumulator
-    fn reset(&mut self) {
+    fn reset(&mut self, current_position: &Isometry<Real>, _current_velocity: &Vector<Real>) {
+        self.rotation = current_position.rotation;
         self.position = Default::default();
         self.normal = Default::default();
         self.count = 0;

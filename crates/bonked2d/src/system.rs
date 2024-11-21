@@ -25,7 +25,7 @@ pub struct Querier<'q, A: 'static + Send + Sync> {
     recopy_velocities: PreparedQuery<(&'q NextVelocity, &'q mut Velocity)>,
 
     /// Reset the collision status
-    reset_status: PreparedQuery<&'q mut CollisionStatus<A>>,
+    reset_status: PreparedQuery<(&'q Position, &'q Velocity, &'q mut CollisionStatus<A>)>,
 
     /// Update the bounding-box of static objects
     compute_static_boxes:
@@ -102,8 +102,8 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
         for (_, (next, current)) in self.recopy_velocities.query_mut(world) {
             current.0 = next.0;
         }
-        for (_, status) in self.reset_status.query_mut(world) {
-            status.0.reset();
+        for (_, (pos, vel, status)) in self.reset_status.query_mut(world) {
+            status.0.reset(&pos.0, &vel.0);
         }
     }
 
