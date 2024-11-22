@@ -1,4 +1,3 @@
-use crate::math::is_null;
 use parry3d::{
     math::{Isometry, Point, Real, Translation, UnitVector, Vector},
     na::UnitQuaternion,
@@ -25,9 +24,6 @@ pub trait Accumulator<A>: Send + Sync {
     /// Get the position
     fn get_position(&self) -> Option<Isometry<Real>>;
 
-    /// Get the normal
-    fn get_normal(&self) -> Option<UnitVector<Real>>;
-
     /// Get the velocity
     fn get_velocity(&self) -> Option<Vector<Real>>;
 }
@@ -44,9 +40,6 @@ pub struct DefaultAccumulator {
     /// Resolved average position
     position: Vector<Real>,
 
-    /// Average normal direction
-    normal: Vector<Real>,
-
     /// Count the number of contact that have been added
     count: usize,
 }
@@ -58,7 +51,6 @@ impl DefaultAccumulator {
             radius,
             rotation: Default::default(),
             position: Default::default(),
-            normal: Default::default(),
             count: 0,
         }
     }
@@ -69,7 +61,6 @@ impl<A> Accumulator<A> for DefaultAccumulator {
     fn reset(&mut self, current_position: &Isometry<Real>, _current_velocity: &Vector<Real>) {
         self.rotation = current_position.rotation;
         self.position = Default::default();
-        self.normal = Default::default();
         self.count = 0;
     }
 
@@ -77,7 +68,6 @@ impl<A> Accumulator<A> for DefaultAccumulator {
     fn add_contact(&mut self, point: &Point<Real>, normal: &UnitVector<Real>, _attributes: &A) {
         let normal = normal.into_inner();
         self.position += point.coords + normal * self.radius;
-        self.normal += normal;
         self.count += 1;
     }
 
@@ -103,20 +93,8 @@ impl<A> Accumulator<A> for DefaultAccumulator {
         }
     }
 
-    /// Get the averaged normal
-    fn get_normal(&self) -> Option<UnitVector<Real>> {
-        if self.count > 0 && !is_null(&self.normal) {
-            Some(UnitVector::new_normalize(self.normal))
-        } else {
-            None
-        }
-    }
-
     /// Return a null velocity
     fn get_velocity(&self) -> Option<Vector<Real>> {
         None
     }
 }
-
-#[cfg(test)]
-mod tests {}
