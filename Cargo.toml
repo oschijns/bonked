@@ -1,9 +1,15 @@
 [workspace]
 members = ["crates/bonked2d", "crates/bonked3d"]
+resolver = "2"
 
 [workspace.package]
-name = "bonked"
 description = "A really simple physics engine intended for making games on embedded systems"
 authors = ["Olivier Schyns <https://github.com/oschijns>"]
-version = "0.1.1"
+repository = "https://github.com/oschijns/bonked"
+version = "0.1.2"
 edition = "2021"
+
+
+#[patch.crates-io]
+#bonked2d = { path = "crates/bonked2d" }
+#bonked3d = { path = "crates/bonked3d" }

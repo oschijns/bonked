@@ -1,17 +1,23 @@
 [package]
 name = "bonked2d"
-version = "0.1.0"
-edition = "2021"
+description = "A really simple 2D physics engine"
+authors.workspace = true
+repository.workspace = true
+version.workspace = true
+edition.workspace = true
+#license.workspace = true
 
 [features]
 default = ["std"]
 
 # enable support for the standard library
-std = []
+std = ["hecs/std", "parry2d/std"]
 
 [dependencies]
-hecs = { version = "0.10", default-features = false, features = ["macros"] }
+hecs = { version = "0.10", default-features = false }
 parry2d = { version = "0.17", default-features = false, features = [
-    "required-features",
     "alloc",
+    "f32",
+    "dim2",
 ] }
+spin = "0.9"

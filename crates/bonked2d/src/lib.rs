@@ -1,23 +1,23 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
-
-/// Accumulator for contact processing
-pub mod accumulator;
-
-/// Math functions
-pub mod math;
-
-/// Systems for processing objects
-pub mod system;
-
 use accumulator::Accumulator;
-use alloc::{boxed::Box, sync::Arc};
+use alloc::sync::Arc;
 use parry2d::{
     bounding_volume::Aabb,
     math::{Isometry, Real, Vector},
     shape::Shape,
 };
+use spin::Mutex;
+
+/// Accumulator for contact processing
+pub mod accumulator;
+
+/// Math functions
+mod math;
+
+/// Systems for processing objects
+pub mod system;
 
 /// Collision mask
 pub type Mask = u32;
@@ -56,4 +56,4 @@ pub struct BoundingBox(pub Aabb);
 pub struct Gravity(pub Vector<Real>);
 
 /// Collision state
-pub struct CollisionStatus<A>(pub Box<dyn Accumulator<A>>);
+pub struct CollisionStatus<A>(pub Arc<Mutex<dyn Accumulator<A>>>);
