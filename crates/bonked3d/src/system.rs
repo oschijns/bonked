@@ -4,15 +4,6 @@ use crate::{
 use hecs::{PreparedQuery, With, Without, World};
 use parry3d::{bounding_volume::BoundingVolume, math::Real, query::contact};
 
-/// Query format for processing kinematic on kinematic collisions
-type ProcessKinematics<'q, A> = PreparedQuery<(
-    &'q Collider<A>,
-    &'q NextPosition,
-    &'q Velocity,
-    &'q BoundingBox,
-    &'q mut CollisionStatus<A>,
-)>;
-
 /// Store prepared queries to be applied to a world
 pub struct Querier<'q, A: 'static + Send + Sync> {
     /// The delta time used for computation
@@ -58,10 +49,12 @@ pub struct Querier<'q, A: 'static + Send + Sync> {
         PreparedQuery<Without<(&'q Collider<A>, &'q Position, &'q BoundingBox), &'q Velocity>>,
 
     /// Process moving objects
-    process_kinematics1: ProcessKinematics<'q, A>,
-
-    /// Process moving objects
-    process_kinematics2: ProcessKinematics<'q, A>,
+    process_kinematics2: PreparedQuery<(
+        &'q Collider<A>,
+        &'q NextPosition,
+        &'q Velocity,
+        &'q BoundingBox,
+    )>,
 
     /// Use collision status to resolve object placement and velocity
     process_status: PreparedQuery<(
@@ -87,7 +80,6 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
             recompute_swept_boxes: Default::default(),
             process_kinematics: Default::default(),
             get_statics: Default::default(),
-            process_kinematics1: Default::default(),
             process_kinematics2: Default::default(),
             process_gravity: Default::default(),
             process_status: Default::default(),
@@ -158,51 +150,30 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
     /// Compute collisions between kinematic objects
     pub fn compute_collisions_with_kinematics(&mut self, world: &mut World) {
         // count the number of entities that have been processed
-        let mut count = 0usize;
-        for (id1, (coll1, next_pos1, vel1, box1, stat1)) in
-            self.process_kinematics1.query(world).iter()
-        {
-            count += 1;
-
+        for (id1, (coll1, next_pos1, box1, stat1)) in self.process_kinematics.query(world).iter() {
             // skip the entities that have been already processed
-            for (id2, (coll2, next_pos2, vel2, box2, stat2)) in
-                self.process_kinematics2.query(world).iter().skip(count)
+            for (id2, (coll2, next_pos2, vel2, box2)) in
+                self.process_kinematics2.query(world).iter()
             {
-                if id1 != id2 {
-                    // check for collision both ways
-                    let collide_1_to_2 = coll1.can_collide_with(coll2);
-                    let collide_2_to_1 = coll2.can_collide_with(coll1);
-
-                    if (collide_1_to_2 || collide_2_to_1) && box1.0.intersects(&box2.0) {
-                        match contact(
-                            &next_pos1.0,
-                            coll1.shape.as_ref(),
-                            &next_pos2.0,
-                            coll2.shape.as_ref(),
-                            0.0,
-                        ) {
-                            Ok(Some(contact)) => {
-                                if collide_1_to_2 {
-                                    stat1.0.add_contact_with_velocity(
-                                        &contact.point1,
-                                        &contact.normal1,
-                                        &coll2.attributes,
-                                        &vel2.0,
-                                    );
-                                }
-                                if collide_2_to_1 {
-                                    stat2.0.add_contact_with_velocity(
-                                        &contact.point2,
-                                        &contact.normal2,
-                                        &coll1.attributes,
-                                        &vel1.0,
-                                    );
-                                }
-                            }
-                            Ok(None) => {}
-                            Err(unsupported) => {
-                                panic!["{}", unsupported];
-                            }
+                if id1 != id2 && coll1.can_collide_with(coll2) && box1.0.intersects(&box2.0) {
+                    match contact(
+                        &next_pos1.0,
+                        coll1.shape.as_ref(),
+                        &next_pos2.0,
+                        coll2.shape.as_ref(),
+                        0.0,
+                    ) {
+                        Ok(Some(contact)) => {
+                            stat1.0.add_contact_with_velocity(
+                                &contact.point1,
+                                &contact.normal1,
+                                &coll2.attributes,
+                                &vel2.0,
+                            );
+                        }
+                        Ok(None) => {}
+                        Err(unsupported) => {
+                            panic!["{}", unsupported];
                         }
                     }
                 }
