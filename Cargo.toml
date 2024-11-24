@@ -6,7 +6,7 @@ resolver = "2"
 description = "A really simple physics engine intended for making games on embedded systems"
 authors = ["Olivier Schyns <https://github.com/oschijns>"]
 repository = "https://github.com/oschijns/bonked"
-version = "0.1.2"
+version = "0.1.4"
 edition = "2021"
 
 

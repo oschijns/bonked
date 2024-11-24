@@ -20,4 +20,3 @@ parry3d = { version = "0.17", default-features = false, features = [
     "f32",
     "dim3",
 ] }
-spin = "0.9"

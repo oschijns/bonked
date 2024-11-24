@@ -2,13 +2,12 @@
 
 extern crate alloc;
 use accumulator::Accumulator;
-use alloc::sync::Arc;
+use alloc::{boxed::Box, sync::Arc};
 use parry2d::{
     bounding_volume::Aabb,
     math::{Isometry, Real, Vector},
     shape::Shape,
 };
-use spin::Mutex;
 
 /// Accumulator for contact processing
 pub mod accumulator;
@@ -56,4 +55,4 @@ pub struct BoundingBox(pub Aabb);
 pub struct Gravity(pub Vector<Real>);
 
 /// Collision state
-pub struct CollisionStatus<A>(pub Arc<Mutex<dyn Accumulator<A>>>);
+pub struct CollisionStatus<A>(pub Box<dyn Accumulator<A>>);

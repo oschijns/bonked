@@ -103,7 +103,7 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
             current.0 = next.0;
         }
         for (_, (pos, vel, status)) in self.reset_status.query_mut(world) {
-            status.0.lock().reset(&pos.0, &vel.0);
+            status.0.reset(&pos.0, &vel.0);
         }
     }
 
@@ -139,9 +139,11 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
                         0.0,
                     ) {
                         Ok(Some(contact)) => {
-                            stat1.0.try_lock().map(|mut a| {
-                                a.add_contact(&contact.point1, &contact.normal1, &coll2.attributes)
-                            });
+                            stat1.0.add_contact(
+                                &contact.point1,
+                                &contact.normal1,
+                                &coll2.attributes,
+                            );
                         }
                         Ok(None) => {}
                         Err(unsupported) => {
@@ -181,24 +183,20 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
                         ) {
                             Ok(Some(contact)) => {
                                 if collide_1_to_2 {
-                                    stat1.0.try_lock().map(|mut a| {
-                                        a.add_contact_with_velocity(
-                                            &contact.point1,
-                                            &contact.normal1,
-                                            &coll2.attributes,
-                                            &vel2.0,
-                                        )
-                                    });
+                                    stat1.0.add_contact_with_velocity(
+                                        &contact.point1,
+                                        &contact.normal1,
+                                        &coll2.attributes,
+                                        &vel2.0,
+                                    );
                                 }
                                 if collide_2_to_1 {
-                                    stat2.0.try_lock().map(|mut a| {
-                                        a.add_contact_with_velocity(
-                                            &contact.point2,
-                                            &contact.normal2,
-                                            &coll1.attributes,
-                                            &vel1.0,
-                                        )
-                                    });
+                                    stat2.0.add_contact_with_velocity(
+                                        &contact.point2,
+                                        &contact.normal2,
+                                        &coll1.attributes,
+                                        &vel1.0,
+                                    );
                                 }
                             }
                             Ok(None) => {}
@@ -215,19 +213,16 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
     /// Use the collision status to deduce how to position the objects
     pub fn apply_collision_status(&mut self, world: &mut World) {
         for (_, (status, vel, next_pos, next_vel)) in self.process_status.query_mut(world) {
-            // if we failed to lock the accumulator, just give up
-            if let Some(accu) = status.0.try_lock() {
-                // Should the position be overriden ?
-                if let Some(new_pos) = accu.get_position() {
-                    next_pos.0 = new_pos;
-                }
+            // Should the position be overriden ?
+            if let Some(new_pos) = status.0.get_position() {
+                next_pos.0 = new_pos;
+            }
 
-                // should the velocity be overriden ?
-                if let Some(new_vel) = accu.get_velocity() {
-                    next_vel.0 = new_vel;
-                } else {
-                    next_vel.0 = vel.0;
-                }
+            // should the velocity be overriden ?
+            if let Some(new_vel) = status.0.get_velocity() {
+                next_vel.0 = new_vel;
+            } else {
+                next_vel.0 = vel.0;
             }
         }
     }

@@ -20,4 +20,3 @@ parry2d = { version = "0.17", default-features = false, features = [
     "f32",
     "dim2",
 ] }
-spin = "0.9"
