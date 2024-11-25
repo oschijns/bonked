@@ -2,7 +2,11 @@ use crate::{
     BoundingBox, Collider, CollisionStatus, Gravity, NextPosition, NextVelocity, Position, Velocity,
 };
 use hecs::{PreparedQuery, With, Without, World};
-use parry3d::{bounding_volume::BoundingVolume, math::Real, query::contact};
+use parry3d::{
+    bounding_volume::BoundingVolume,
+    math::{Real, Vector},
+    query::contact,
+};
 
 /// Store prepared queries to be applied to a world
 pub struct Querier<'q, A: 'static + Send + Sync> {
@@ -118,6 +122,8 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
 
     /// Compute collisions between kinematic and static objects
     pub fn compute_collisions_with_statics(&mut self, world: &mut World) {
+        const NULL_VEL: Vector<Real> = Vector::new(0.0, 0.0, 0.0);
+
         for (id1, (coll1, next_pos1, box1, stat1)) in self.process_kinematics.query(world).iter() {
             for (id2, (coll2, pos2, box2)) in self.get_statics.query(world).iter() {
                 // if the two objects are different (should always be true)
@@ -134,6 +140,7 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
                             stat1.0.add_contact(
                                 &contact.point1,
                                 &contact.normal1,
+                                &NULL_VEL,
                                 &coll2.attributes,
                             );
                         }
@@ -164,11 +171,11 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
                         0.0,
                     ) {
                         Ok(Some(contact)) => {
-                            stat1.0.add_contact_with_velocity(
+                            stat1.0.add_contact(
                                 &contact.point1,
                                 &contact.normal1,
-                                &coll2.attributes,
                                 &vel2.0,
+                                &coll2.attributes,
                             );
                         }
                         Ok(None) => {}

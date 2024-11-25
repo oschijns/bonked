@@ -8,17 +8,13 @@ pub trait Accumulator<A>: Send + Sync {
     /// Reset the accumulator for a new tick
     fn reset(&mut self, current_position: &Isometry<Real>, current_velocity: &Vector<Real>);
 
-    /// Add the contact point and normal to this accumulator
-    fn add_contact(&mut self, point: &Point<Real>, normal: &UnitVector<Real>, attributes: &A);
-
-    /// Add the contact point, the normal and the velocity
-    /// of the other object to this accumulator.
-    fn add_contact_with_velocity(
+    /// Add the contact point, normal and velocity to this accumulator
+    fn add_contact(
         &mut self,
         point: &Point<Real>,
         normal: &UnitVector<Real>,
-        attributes: &A,
         velocity: &Vector<Real>,
+        attributes: &A,
     );
 
     /// Get the position
@@ -65,22 +61,16 @@ impl<A> Accumulator<A> for DefaultAccumulator {
     }
 
     /// Add the contact while ignoring the attributes
-    fn add_contact(&mut self, point: &Point<Real>, normal: &UnitVector<Real>, _attributes: &A) {
-        let normal = normal.into_inner();
-        self.position += point.coords + normal * self.radius;
-        self.count += 1;
-    }
-
-    /// Add the contact while ignoring the attributes and the velocity
-    fn add_contact_with_velocity(
+    fn add_contact(
         &mut self,
         point: &Point<Real>,
         normal: &UnitVector<Real>,
-        attributes: &A,
         _velocity: &Vector<Real>,
+        _attributes: &A,
     ) {
-        // simply add the contact and ignore the velocity
-        self.add_contact(point, normal, attributes);
+        let normal = normal.into_inner();
+        self.position += point.coords + normal * self.radius;
+        self.count += 1;
     }
 
     /// Get the averaged position
