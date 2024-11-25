@@ -137,12 +137,7 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
                         0.0,
                     ) {
                         Ok(Some(contact)) => {
-                            stat1.0.add_contact(
-                                &contact.point1,
-                                &contact.normal1,
-                                &NULL_VEL,
-                                &coll2.attributes,
-                            );
+                            stat1.0.add_contact(&contact, &NULL_VEL, &coll2.attributes);
                         }
                         Ok(None) => {}
                         Err(unsupported) => {
@@ -171,12 +166,7 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
                         0.0,
                     ) {
                         Ok(Some(contact)) => {
-                            stat1.0.add_contact(
-                                &contact.point1,
-                                &contact.normal1,
-                                &vel2.0,
-                                &coll2.attributes,
-                            );
+                            stat1.0.add_contact(&contact, &vel2.0, &coll2.attributes);
                         }
                         Ok(None) => {}
                         Err(unsupported) => {

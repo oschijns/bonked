@@ -1,6 +1,7 @@
 use parry2d::{
-    math::{Isometry, Point, Real, UnitVector, Vector},
+    math::{Isometry, Real, Vector},
     na::{Translation, UnitComplex},
+    query::Contact,
 };
 
 /// Collision accumulator
@@ -9,13 +10,7 @@ pub trait Accumulator<A>: Send + Sync {
     fn reset(&mut self, current_position: &Isometry<Real>, current_velocity: &Vector<Real>);
 
     /// Add the contact point, normal and velocity to this accumulator
-    fn add_contact(
-        &mut self,
-        point: &Point<Real>,
-        normal: &UnitVector<Real>,
-        velocity: &Vector<Real>,
-        attributes: &A,
-    );
+    fn add_contact(&mut self, contact: &Contact, velocity: &Vector<Real>, attributes: &A);
 
     /// Get the position
     fn get_position(&self) -> Option<Isometry<Real>>;
@@ -25,11 +20,8 @@ pub trait Accumulator<A>: Send + Sync {
 }
 
 /// Example of implementation of an accumulator
+#[derive(Default, Debug)]
 pub struct DefaultAccumulator {
-    /// Assuming the collider is a sphere this indicate
-    /// how far the center point should be offset.
-    radius: Real,
-
     /// The rotation of the object
     rotation: UnitComplex<Real>,
 
@@ -38,18 +30,6 @@ pub struct DefaultAccumulator {
 
     /// Count the number of contact that have been added
     count: usize,
-}
-
-impl DefaultAccumulator {
-    /// Create a new accumulator with the provided shape radius
-    pub fn new(radius: Real) -> Self {
-        Self {
-            radius,
-            rotation: Default::default(),
-            position: Default::default(),
-            count: 0,
-        }
-    }
 }
 
 impl<A> Accumulator<A> for DefaultAccumulator {
@@ -61,15 +41,8 @@ impl<A> Accumulator<A> for DefaultAccumulator {
     }
 
     /// Add the contact while ignoring the attributes
-    fn add_contact(
-        &mut self,
-        point: &Point<Real>,
-        normal: &UnitVector<Real>,
-        _velocity: &Vector<Real>,
-        _attributes: &A,
-    ) {
-        let normal = normal.into_inner();
-        self.position += point.coords + normal * self.radius;
+    fn add_contact(&mut self, contact: &Contact, _velocity: &Vector<Real>, _attributes: &A) {
+        self.position += contact.point2.coords + contact.normal2.into_inner() * contact.dist.abs();
         self.count += 1;
     }
 
