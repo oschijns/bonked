@@ -7,16 +7,42 @@ version.workspace = true
 edition.workspace = true
 #license.workspace = true
 
+# Compile Features
 [features]
-default = ["std"]
+required-features = ["3d"]
+default = ["required-features", "parry-f32", "mask-u32", "std"]
+3d = []
+mask-u32 = []
+mask-u64 = []
 
 # enable support for the standard library
-std = ["hecs/std", "parry3d/std"]
+std = ["hecs/std", "parry3d?/std", "parry3d-f64?/std"]
+alloc = ["parry3d?/alloc", "parry3d-f64?/alloc"]
+simd = ["parry3d?/simd-stable", "parry3d-f64?/simd-stable"]
 
+# We unfortunately can't reuse the f32 and f64 features for this,
+# because Parry uses separate crates for f32 and f64.
+parry-f32 = ["dep:parry3d"]
+parry-f64 = ["dep:parry3d-f64"]
+
+# invalid feature
+2d = []
+
+
+# Library configuration
+[lib]
+name = "bonked3d"
+path = "../../src/lib.rs"
+
+
+# Dependencies
 [dependencies]
 hecs = { version = "0.10", default-features = false }
-parry3d = { version = "0.17", default-features = false, features = [
-    "alloc",
-    "f32",
+parry3d = { version = "0.17", features = [
     "dim3",
-] }
+    "f32",
+], default-features = false, optional = true }
+parry3d-f64 = { version = "0.17", features = [
+    "dim3",
+    "f64",
+], default-features = false, optional = true }

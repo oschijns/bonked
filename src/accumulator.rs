@@ -1,6 +1,5 @@
-use parry3d::{
+use parry::{
     math::{Isometry, Real, Translation, Vector},
-    na::UnitQuaternion,
     query::Contact,
 };
 
@@ -19,11 +18,17 @@ pub trait Accumulator<A>: Send + Sync {
     fn get_velocity(&self) -> Option<Vector<Real>>;
 }
 
+#[cfg(feature = "2d")]
+type Rotation = parry::na::UnitComplex<Real>;
+
+#[cfg(feature = "3d")]
+type Rotation = parry::na::UnitQuaternion<Real>;
+
 /// Example of implementation of an accumulator
 #[derive(Default, Debug)]
 pub struct DefaultAccumulator {
     /// The orientation of the object
-    rotation: UnitQuaternion<Real>,
+    rotation: Rotation,
 
     /// Resolved average position
     position: Vector<Real>,
@@ -42,7 +47,7 @@ impl<A> Accumulator<A> for DefaultAccumulator {
 
     /// Add the contact while ignoring the attributes
     fn add_contact(&mut self, contact: &Contact, _velocity: &Vector<Real>, _attributes: &A) {
-        self.position += contact.point2.coords + contact.normal2.into_inner() * contact.dist.abs();
+        self.position += contact.point2.coords + contact.normal2.into_inner() * contact.dist;
         self.count += 1;
     }
 

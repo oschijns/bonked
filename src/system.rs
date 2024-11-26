@@ -2,9 +2,9 @@ use crate::{
     BoundingBox, Collider, CollisionStatus, Gravity, NextPosition, NextVelocity, Position, Velocity,
 };
 use hecs::{PreparedQuery, With, Without, World};
-use parry3d::{
+use parry::{
     bounding_volume::BoundingVolume,
-    math::{Real, Vector},
+    math::{Real, Translation, Vector},
     query::contact,
 };
 
@@ -115,13 +115,18 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
         for (_, (collider, position, velocity, bounding_box, next_pos)) in
             self.recompute_swept_boxes.query_mut(world)
         {
-            next_pos.0 = position.get_end_point(velocity.0 * self.delta_time);
+            let mut end_pos = position.0;
+            end_pos.append_translation_mut(&Translation::from(velocity.0 * self.delta_time));
+            next_pos.0 = end_pos;
             bounding_box.0 = collider.shape.compute_swept_aabb(&position.0, &next_pos.0);
         }
     }
 
     /// Compute collisions between kinematic and static objects
     pub fn compute_collisions_with_statics(&mut self, world: &mut World) {
+        #[cfg(feature = "2d")]
+        const NULL_VEL: Vector<Real> = Vector::new(0.0, 0.0);
+        #[cfg(feature = "3d")]
         const NULL_VEL: Vector<Real> = Vector::new(0.0, 0.0, 0.0);
 
         for (id1, (coll1, next_pos1, box1, stat1)) in self.process_kinematics.query(world).iter() {
