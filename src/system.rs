@@ -53,12 +53,7 @@ pub struct Querier<'q, A: 'static + Send + Sync> {
         PreparedQuery<Without<(&'q Collider<A>, &'q Position, &'q BoundingBox), &'q Velocity>>,
 
     /// Process moving objects
-    process_kinematics2: PreparedQuery<(
-        &'q Collider<A>,
-        &'q NextPosition,
-        &'q Velocity,
-        &'q BoundingBox,
-    )>,
+    get_kinematics: PreparedQuery<(&'q Collider<A>, &'q Position, &'q Velocity, &'q BoundingBox)>,
 
     /// Use collision status to resolve object placement and velocity
     process_status: PreparedQuery<(
@@ -84,7 +79,7 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
             recompute_swept_boxes: Default::default(),
             process_kinematics: Default::default(),
             get_statics: Default::default(),
-            process_kinematics2: Default::default(),
+            get_kinematics: Default::default(),
             process_gravity: Default::default(),
             process_status: Default::default(),
         }
@@ -159,14 +154,12 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
         // count the number of entities that have been processed
         for (id1, (coll1, next_pos1, box1, stat1)) in self.process_kinematics.query(world).iter() {
             // skip the entities that have been already processed
-            for (id2, (coll2, next_pos2, vel2, box2)) in
-                self.process_kinematics2.query(world).iter()
-            {
+            for (id2, (coll2, pos2, vel2, box2)) in self.get_kinematics.query(world).iter() {
                 if id1 != id2 && coll1.can_collide_with(coll2) && box1.0.intersects(&box2.0) {
                     match contact(
                         &next_pos1.0,
                         coll1.shape.as_ref(),
-                        &next_pos2.0,
+                        &pos2.0,
                         coll2.shape.as_ref(),
                         0.0,
                     ) {

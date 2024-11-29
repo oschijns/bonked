@@ -1,10 +1,14 @@
+use core::any::Any;
 use parry::{
     math::{Isometry, Real, Translation, Vector},
     query::Contact,
 };
 
 /// Collision accumulator
-pub trait Accumulator<A>: Send + Sync {
+pub trait Accumulator<A>: Send + Sync + Any {
+    /// Enable dynamic casting
+    fn as_any(&self) -> &dyn Any;
+
     /// Reset the accumulator for a new tick
     fn reset(&mut self, current_position: &Isometry<Real>, current_velocity: &Vector<Real>);
 
@@ -38,6 +42,11 @@ pub struct DefaultAccumulator {
 }
 
 impl<A> Accumulator<A> for DefaultAccumulator {
+    /// Enable dynamic casting
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     /// Reset the accumulator
     fn reset(&mut self, current_position: &Isometry<Real>, _current_velocity: &Vector<Real>) {
         self.rotation = current_position.rotation;
