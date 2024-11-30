@@ -32,11 +32,15 @@ use alloc::{boxed::Box, sync::Arc};
 use parry::{
     bounding_volume::Aabb,
     math::{Isometry, Real, Vector},
+    query::Ray,
     shape::Shape,
 };
 
 /// Accumulator for contact processing
 pub mod accumulator;
+
+/// Functions for raycast
+mod raycast;
 
 /// Systems for processing objects
 pub mod system;
@@ -83,10 +87,54 @@ pub struct Gravity(pub Vector<Real>);
 /// Collision state
 pub struct CollisionStatus<A>(pub Box<dyn Accumulator<A>>);
 
-impl<A> Collider<A> {
-    /// Check if the collision layer of the first object match the one of the second
+/// Cast a Ray in the world
+pub struct RayCaster {
+    /// Private parameters of the raycast
+    internal: InternalRay,
+
+    /// Should the ray treat colliders as solid objects
+    pub solid: bool,
+
+    /// The collision mask used by the ray
+    pub mask: Mask,
+}
+
+struct InternalRay {
+    /// The parry ray
+    ray: Ray,
+
+    /// The length of the ray
+    length: Real,
+
+    /// The bounding box of the raycast
+    aabb: Aabb,
+}
+
+trait CanCollideWith {
+    /// Return true if the collision mask of this object match the collision layer of the other
+    fn can_collide_with<A>(&self, collider: &Collider<A>) -> bool;
+}
+
+impl<A> CanCollideWith for Collider<A> {
+    /// Return true if the collision mask of this object match the collision layer of the other
     #[inline]
-    pub fn can_collide_with(&self, other: &Self) -> bool {
-        (self.layer & other.mask) != 0
+    fn can_collide_with<A2>(&self, collider: &Collider<A2>) -> bool {
+        (self.mask & collider.layer) != 0
     }
 }
+
+impl CanCollideWith for RayCaster {
+    /// Return true if the collision mask of this ray match the collision layer of the other object
+    #[inline]
+    fn can_collide_with<A>(&self, collider: &Collider<A>) -> bool {
+        (self.mask & collider.layer) != 0
+    }
+}
+
+/// Null vector for 2D
+#[cfg(feature = "2d")]
+const NULL_VEL: Vector<Real> = Vector::new(0.0, 0.0);
+
+/// Null vector for 3D
+#[cfg(feature = "3d")]
+const NULL_VEL: Vector<Real> = Vector::new(0.0, 0.0, 0.0);

@@ -1,11 +1,12 @@
 use crate::{
-    BoundingBox, Collider, CollisionStatus, Gravity, NextPosition, NextVelocity, Position, Velocity,
+    BoundingBox, CanCollideWith, Collider, CollisionStatus, Gravity, NextPosition, NextVelocity,
+    Position, RayCaster, Velocity, NULL_VEL,
 };
-use hecs::{PreparedQuery, With, Without, World};
+use hecs::{Entity, PreparedQuery, With, Without, World};
 use parry::{
     bounding_volume::BoundingVolume,
-    math::{Real, Translation, Vector},
-    query::contact,
+    math::{Real, Translation},
+    query::{contact, RayIntersection},
 };
 
 /// Store prepared queries to be applied to a world
@@ -65,6 +66,9 @@ pub struct Querier<'q, A: 'static + Send + Sync> {
 
     /// Apply the gravity to the next velocity
     process_gravity: PreparedQuery<(&'q Gravity, &'q mut NextVelocity)>,
+
+    /// Perform a raycast against physics bodies in the world
+    do_raycast: PreparedQuery<(&'q Collider<A>, &'q Position, &'q BoundingBox)>,
 }
 
 impl<'q, A: Send + Sync> Querier<'q, A> {
@@ -82,7 +86,14 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
             get_kinematics: Default::default(),
             process_gravity: Default::default(),
             process_status: Default::default(),
+            do_raycast: Default::default(),
         }
+    }
+
+    /// Get the delta time set for this physics simulation
+    #[inline]
+    pub fn get_delta_time(&self) -> Real {
+        self.delta_time
     }
 
     /// Recopy "next" state to "current" state for next tick
@@ -119,11 +130,6 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
 
     /// Compute collisions between kinematic and static objects
     pub fn compute_collisions_with_statics(&mut self, world: &mut World) {
-        #[cfg(feature = "2d")]
-        const NULL_VEL: Vector<Real> = Vector::new(0.0, 0.0);
-        #[cfg(feature = "3d")]
-        const NULL_VEL: Vector<Real> = Vector::new(0.0, 0.0, 0.0);
-
         for (id1, (coll1, next_pos1, box1, stat1)) in self.process_kinematics.query(world).iter() {
             for (id2, (coll2, pos2, box2)) in self.get_statics.query(world).iter() {
                 // if the two objects are different (should always be true)
@@ -198,5 +204,35 @@ impl<'q, A: Send + Sync> Querier<'q, A> {
         for (_, (grav, next_vel)) in self.process_gravity.query_mut(world) {
             next_vel.0 += grav.0 * self.delta_time;
         }
+    }
+
+    /// Apply a raycast to all physics bodies in the world
+    pub fn raycast(
+        &mut self,
+        world: &mut World,
+        ray: &RayCaster,
+    ) -> Option<(Entity, RayIntersection)> {
+        // identify the closest object hit
+        let mut found = None;
+        let mut max_dist = Real::MAX;
+
+        // iterate over all the physics object in the world
+        for (id, (collider, position, bounding_box)) in self.do_raycast.query_mut(world) {
+            if ray.can_collide_with(collider) && ray.internal.aabb.intersects(&bounding_box.0) {
+                if let Some(hit) = collider.shape.cast_ray_and_get_normal(
+                    &position.0,
+                    &ray.internal.ray,
+                    ray.internal.length,
+                    ray.solid,
+                ) {
+                    // elect this object as the closest hit object
+                    if hit.time_of_impact < max_dist {
+                        found = Some((id, hit));
+                        max_dist = hit.time_of_impact;
+                    }
+                }
+            }
+        }
+        found
     }
 }
