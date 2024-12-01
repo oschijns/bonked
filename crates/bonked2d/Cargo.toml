@@ -17,7 +17,11 @@ mask-u64 = []
 
 # enable support for the standard library
 std = ["hecs/std", "parry2d?/std", "parry2d-f64?/std"]
+
+# enable support for alloc
 alloc = ["parry2d?/alloc", "parry2d-f64?/alloc"]
+
+# enable support for Single Instruction Multiple Data
 simd = ["parry2d?/simd-stable", "parry2d-f64?/simd-stable"]
 
 # We unfortunately can't reuse the f32 and f64 features for this,
@@ -25,8 +29,10 @@ simd = ["parry2d?/simd-stable", "parry2d-f64?/simd-stable"]
 parry-f32 = ["dep:parry2d"]
 parry-f64 = ["dep:parry2d-f64"]
 
-# invalid feature
-3d = []
+
+# Ignore "3d" feature
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature = "3d")'] }
 
 
 # Library configuration

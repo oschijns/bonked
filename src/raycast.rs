@@ -2,6 +2,7 @@ use crate::{InternalRay, Mask, RayCaster, NULL_VEL};
 use parry::{
     bounding_volume::Aabb,
     math::{Point, Real, Vector},
+    na::ComplexField,
     query::Ray,
 };
 
@@ -95,7 +96,7 @@ impl InternalRay {
             Self::new_null(origin)
         } else {
             // apply square root now
-            let speed = sqr_speed.sqrt();
+            let speed = <Real as ComplexField>::sqrt(sqr_speed);
 
             // compute the AABB around the ray
             let mut aabb = Aabb::new_invalid();
