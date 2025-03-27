@@ -1,6 +1,6 @@
 [package]
 name = "bonked3d"
-description = "A really simple 3D physics engine"
+description = "Simple 3D collision engine"
 authors.workspace = true
 repository.workspace = true
 version.workspace = true
@@ -12,11 +12,12 @@ edition.workspace = true
 required-features = ["3d"]
 default = ["required-features", "parry-f32", "mask-u32", "std"]
 3d = []
+2d = []
 mask-u32 = []
 mask-u64 = []
 
 # enable support for the standard library
-std = ["hecs/std", "parry3d?/std", "parry3d-f64?/std"]
+std = ["bvh-arena/std", "parry3d?/std", "parry3d-f64?/std"]
 
 # enable support for alloc
 alloc = ["parry3d?/alloc", "parry3d-f64?/alloc"]
@@ -32,7 +33,7 @@ parry-f64 = ["dep:parry3d-f64"]
 
 # Ignore "2d" feature
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature = "2d")'] }
+#unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature = "2d")'] }
 
 
 # Library configuration
@@ -43,12 +44,13 @@ path = "../../src/lib.rs"
 
 # Dependencies
 [dependencies]
-hecs = { version = "0.10", default-features = false }
-parry3d = { version = "0.17", features = [
+#hecs = { version = "0.10", default-features = false }
+bvh-arena = { version = "1.1", default-features = false }
+parry3d = { git = "https://github.com/Jondolf/barry.git", branch = "no-std", features = [
     "dim3",
     "f32",
 ], default-features = false, optional = true }
-parry3d-f64 = { version = "0.17", features = [
+parry3d-f64 = { git = "https://github.com/Jondolf/barry.git", branch = "no-std", features = [
     "dim3",
     "f64",
 ], default-features = false, optional = true }
