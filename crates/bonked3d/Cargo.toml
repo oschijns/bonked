@@ -15,9 +15,10 @@ default = ["required-features", "parry-f32", "mask-u32", "std"]
 2d = []
 mask-u32 = []
 mask-u64 = []
+atomic = ["dep:spin"]
 
 # enable support for the standard library
-std = ["bvh-arena/std", "parry3d?/std", "parry3d-f64?/std"]
+std = ["spin?/std", "bvh-arena/std", "parry3d?/std", "parry3d-f64?/std"]
 
 # enable support for alloc
 alloc = ["parry3d?/alloc", "parry3d-f64?/alloc"]
@@ -44,13 +45,13 @@ path = "../../src/lib.rs"
 
 # Dependencies
 [dependencies]
-#hecs = { version = "0.10", default-features = false }
-bvh-arena = { version = "1.1", default-features = false }
-parry3d = { git = "https://github.com/Jondolf/barry.git", branch = "no-std", features = [
-    "dim3",
-    "f32",
+bvh-arena.workspace = true
+spin = { version = "0.10", optional = true }
+parry3d = { git = "https://github.com/dimforge/parry.git", branch = "master", features = [
+    "required-features",
+    "alloc",
 ], default-features = false, optional = true }
-parry3d-f64 = { git = "https://github.com/Jondolf/barry.git", branch = "no-std", features = [
-    "dim3",
-    "f64",
+parry3d-f64 = { git = "https://github.com/dimforge/parry.git", branch = "master", features = [
+    "required-features",
+    "alloc",
 ], default-features = false, optional = true }
