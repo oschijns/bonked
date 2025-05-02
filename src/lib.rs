@@ -31,7 +31,32 @@ pub extern crate parry3d_f64 as parry;
 
 // pick reference counter type based on feature flags
 
+#[cfg(not(feature = "atomic"))]
+#[macro_use]
+pub mod pointer {
+
+    /// Reference counted pointer type
+    pub type RefCounted<T> = alloc::rc::Rc<T>;
+
+    /// Weak pointer type
+    pub type WeakPointer<T> = alloc::rc::Weak<T>;
+
+    /// Allow mutable access to the inner value
+    pub type Mut<T> = core::cell::RefCell<T>;
+
+    /// Get access to the inner value
+    macro_rules! get_inner {
+        ($ptr:ident) => {
+            ($ptr.borrow())
+        };
+        (mut $ptr:ident) => {
+            ($ptr.borrow_mut())
+        };
+    }
+}
+
 #[cfg(feature = "atomic")]
+#[macro_use]
 pub mod pointer {
     /// Reference counted pointer type
     pub type RefCounted<T> = alloc::sync::Arc<T>;
@@ -42,21 +67,15 @@ pub mod pointer {
     /// Allow mutable access to the inner value
     pub type Mut<T> = spin::Mutex<T>;
 
-    // TODO: define functions to borrow the inner value
-}
-
-#[cfg(not(feature = "atomic"))]
-pub mod pointer {
-    /// Reference counted pointer type
-    pub type RefCounted<T> = alloc::rc::Rc<T>;
-
-    /// Weak pointer type
-    pub type WeakPointer<T> = alloc::rc::Weak<T>;
-
-    /// Allow mutable access to the inner value
-    pub type Mut<T> = core::cell::RefCell<T>;
-
-    // TODO: define functions to borrow the inner value
+    /// Get access to the inner value
+    macro_rules! get_inner {
+        ($ptr:ident) => {
+            ($ptr.lock())
+        };
+        (mut $ptr:ident) => {
+            ($ptr.lock())
+        };
+    }
 }
 
 // pick the mask size based on feature flags

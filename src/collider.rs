@@ -1,9 +1,10 @@
 //! Module containing basic objects definitions.
 
-pub mod traits;
-pub mod volume;
+pub mod bounding_box;
+pub mod handle;
 
 use crate::{pointer::RefCounted, Mask};
+use bounding_box::BoundingBox;
 use bvh_arena::VolumeHandle;
 use parry::{
     math::{Isometry, Real, Vector},
@@ -39,4 +40,7 @@ pub struct DynamicCollider {
 
     /// Velocity of the collider.
     velocity: Vector<Real>,
+
+    /// Resolved sweep bounding box.
+    resolved_sweep: Option<BoundingBox>,
 }
