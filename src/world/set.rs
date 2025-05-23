@@ -1,61 +1,37 @@
-// Simple data structure for storing colliders.
+//! Storage for physics bodies of a given type.
+//! Guarantee that the reference to the bodies are
+//! maintained as long as they are part of the physics world.
 
-use crate::{
-    collider::{
-        bounding_box::{BoundingBox, HasBoundingBox},
-        handle::HasHandle,
-    },
-    pointer::{Mut, RefCounted},
-};
-use bvh_arena::Bvh;
-use parry::math::Real;
+use crate::object::{handle::Handle, Object};
+use alloc::{sync::Arc, vec::Vec};
 
-/// Simple data structure for storing colliders.
+/// Store a set of elements
 #[derive(Default)]
-pub struct Set<T>(Bvh<RefCounted<Mut<T>>, BoundingBox>);
+pub struct Set<O>(pub(crate) Vec<Arc<O>>);
 
-impl<T> Set<T>
+impl<O> Set<O>
 where
-    T: HasBoundingBox + HasHandle,
+    O: Object + 'static,
+    Handle: From<Arc<O>>,
 {
-    /// Inserts a new collider into the set.
-    pub fn insert(&mut self, collider: RefCounted<Mut<T>>, delta: Real) {
-        // extract the collider from the pointer
-        let mut inner = get_inner!(mut collider);
-
-        // insert the collider into the set
-        let volume = inner.compute_bounding_box(delta);
-        let handle = self.0.insert(collider.clone(), volume);
-
-        // store the handle in the collider
-        inner.assign_handle(handle);
+    /// Add a new element to this set
+    pub fn add(&mut self, object: Arc<O>) -> Handle {
+        self.0.push(object.clone());
+        Handle::from(object)
     }
-}
 
-impl<T> Set<T>
-where
-    T: HasHandle,
-{
-    /// Removes a collider from the set.
-    pub fn remove(&mut self, collider: &T) {
-        if let Some(handle) = collider.get_handle() {
-            self.0.remove(handle);
+    /// Remove an element from this set
+    pub fn remove(&mut self, object: Arc<O>) -> Option<Handle> {
+        // find the position of the object in the list
+        for (index, value) in self.0.iter().enumerate() {
+            if Arc::ptr_eq(&object, value) {
+                // We found the index, create an handle and remove the object.
+                self.0.swap_remove(index);
+                return Some(Handle::from(object));
+            }
         }
-    }
-}
 
-impl<T> Set<T>
-where
-    T: HasBoundingBox,
-{
-    /// Finds all colliders that overlap with the given collider.
-    pub fn find_overlaps_with(&self, collider: &T) {
-        if let Some(bbox) = collider.get_bounding_box() {
-            self.0.for_each_overlaps(bbox, |other| {
-                let other = get_inner!(other);
-
-                // TODO: Perform narrow collision detection
-            });
-        }
+        // The object was not found
+        None
     }
 }

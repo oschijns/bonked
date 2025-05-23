@@ -9,19 +9,19 @@ edition.workspace = true
 
 # Compile Features
 [features]
-default = ["required-features", "parry-f32", "mask-u32", "std"]
+default = ["required-features", "parry-f32", "mask-u32", "alloc"]
+#default = ["required-features", "parry-f32", "mask-u32", "std"]
 required-features = ["2d"]
 2d = []
 3d = []
 mask-u32 = []
 mask-u64 = []
-atomic = ["dep:spin"]
 
 # enable support for the standard library
-std = ["spin?/std", "bvh-arena/std", "parry2d?/std", "parry2d-f64?/std"]
+std = ["parry2d?/std", "parry2d-f64?/std"]
 
 # enable support for alloc
-alloc = ["parry2d?/alloc", "parry2d-f64?/alloc"]
+alloc = ["parry2d?/alloc", "parry2d-f64?/alloc", "dep:hashbrown"]
 
 # enable support for Single Instruction Multiple Data
 simd = ["parry2d?/simd-stable", "parry2d-f64?/simd-stable"]
@@ -45,13 +45,21 @@ path = "../../src/lib.rs"
 
 # Dependencies
 [dependencies]
-bvh-arena.workspace = true
-spin = { version = "0.10", optional = true }
-parry2d = { git = "https://github.com/dimforge/parry.git", branch = "master", features = [
+
+# Collision Detection
+parry2d = { version = "0.19", features = [
     "required-features",
     "alloc",
 ], default-features = false, optional = true }
-parry2d-f64 = { git = "https://github.com/dimforge/parry.git", branch = "master", features = [
+parry2d-f64 = { version = "0.19", features = [
     "required-features",
     "alloc",
+], default-features = false, optional = true }
+
+# HashMap & HashSet
+hashbrown = { version = "0.15", features = [
+    "default-hasher",
+    "allocator-api2",
+    "equivalent",
+    "raw-entry",
 ], default-features = false, optional = true }

@@ -9,10 +9,12 @@ repository = "https://github.com/oschijns/bonked"
 version = "0.0.5"
 edition = "2021"
 
-[workspace.dependencies]
-bvh-arena = { version = "1.1", default-features = false }
-#hashbrown = "0.15"
-
 [patch.crates-io]
 bonked2d = { path = "crates/bonked2d" }
 bonked3d = { path = "crates/bonked3d" }
+
+
+[workspace.dev-dependencies]
+
+# Quick rendering
+macroquad = "4.14"

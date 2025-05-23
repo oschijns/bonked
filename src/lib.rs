@@ -12,6 +12,12 @@ compile_error!("The 'parry-f32' & 'parry-f64' features cannot be used at the sam
 #[cfg(all(feature = "mask-u32", feature = "mask-u64"))]
 compile_error!("The 'mask-u32' & 'mask-u64' features cannot be used at the same time.");
 
+/// Define the physics objects
+pub mod object;
+
+/// Define the world
+pub mod world;
+
 /// Use alloc crate for no_std support
 extern crate alloc;
 
@@ -29,55 +35,6 @@ pub extern crate parry3d as parry;
 #[cfg(all(feature = "3d", feature = "parry-f64"))]
 pub extern crate parry3d_f64 as parry;
 
-// pick reference counter type based on feature flags
-
-#[cfg(not(feature = "atomic"))]
-#[macro_use]
-pub mod pointer {
-
-    /// Reference counted pointer type
-    pub type RefCounted<T> = alloc::rc::Rc<T>;
-
-    /// Weak pointer type
-    pub type WeakPointer<T> = alloc::rc::Weak<T>;
-
-    /// Allow mutable access to the inner value
-    pub type Mut<T> = core::cell::RefCell<T>;
-
-    /// Get access to the inner value
-    macro_rules! get_inner {
-        ($ptr:ident) => {
-            ($ptr.borrow())
-        };
-        (mut $ptr:ident) => {
-            ($ptr.borrow_mut())
-        };
-    }
-}
-
-#[cfg(feature = "atomic")]
-#[macro_use]
-pub mod pointer {
-    /// Reference counted pointer type
-    pub type RefCounted<T> = alloc::sync::Arc<T>;
-
-    /// Weak pointer type
-    pub type WeakPointer<T> = alloc::sync::Weak<T>;
-
-    /// Allow mutable access to the inner value
-    pub type Mut<T> = spin::Mutex<T>;
-
-    /// Get access to the inner value
-    macro_rules! get_inner {
-        ($ptr:ident) => {
-            ($ptr.lock())
-        };
-        (mut $ptr:ident) => {
-            ($ptr.lock())
-        };
-    }
-}
-
 // pick the mask size based on feature flags
 
 #[cfg(feature = "mask-u32")]
@@ -86,6 +43,14 @@ pub type Mask = u32;
 #[cfg(feature = "mask-u64")]
 pub type Mask = u64;
 
-// modules
-mod collider;
-mod world;
+// pick hashset and hashmap based on feature flags
+
+#[cfg(feature = "std")]
+pub mod collections {
+    pub use std::collections::{HashMap, HashSet};
+}
+
+#[cfg(not(feature = "std"))]
+pub mod collections {
+    pub use hashbrown::{HashMap, HashSet};
+}
