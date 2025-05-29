@@ -9,6 +9,7 @@ use super::object::{
 };
 use crate::collections::HashSet;
 use alloc::{sync::Arc, vec::Vec};
+use delegate::delegate;
 use parry::{
     math::Real,
     partitioning::{Qbvh, QbvhUpdateWorkspace},
@@ -17,6 +18,7 @@ use parry::{
 use set::Set;
 
 /// Define a physics world
+#[derive(Default)]
 pub struct World {
     /// Store the list of trigger areas
     trigger_set: Set<TriggerArea>,
@@ -28,7 +30,7 @@ pub struct World {
     kinematic_set: Set<KinematicBody>,
 
     /// List of the handles
-    handles: HashSet<Handle>,
+    pub handles: HashSet<Handle>,
 
     /// Broadphase resolution
     qbvh: Qbvh<Handle>,
@@ -44,10 +46,25 @@ pub struct World {
 }
 
 impl World {
+    /// Create a new empty world with a predefined capacity
+    pub fn with_capacity(cap_static: usize, cap_kinematic: usize, cap_trigger: usize) -> Self {
+        Self {
+            static_set: Set::with_capacity(cap_static),
+            kinematic_set: Set::with_capacity(cap_kinematic),
+            trigger_set: Set::with_capacity(cap_trigger),
+            handles: HashSet::with_capacity(cap_static + cap_kinematic + cap_trigger),
+            qbvh: Qbvh::new(),
+            workspace: QbvhUpdateWorkspace::default(),
+            stack: Vec::new(),
+            margin: Real::EPSILON,
+        }
+    }
+
+    //*
     /// Proceed to the broadphase
     pub fn update(&mut self) {
         // Count the total number of kinematic bodies in the physics world
-        let count = self.kinematic_set.0.len();
+        let count = self.kinematic_set.len();
 
         // This section is inspired by rapier's implementation
         // https://docs.rs/rapier3d/0.26.0/src/rapier3d/geometry/broad_phase_qbvh.rs.html
@@ -118,6 +135,7 @@ impl World {
 
         // TODO: perform the narrow phase
     }
+    // */
 }
 
 macro_rules! impl_for_body_set {
@@ -127,14 +145,14 @@ macro_rules! impl_for_body_set {
             pub fn $add(&mut self, body: Arc<$body_type>) {
                 let handle = self.$body_set.add(body);
                 self.handles.insert(handle);
-                self.qbvh.pre_update_or_insert(handle);
+                //self.qbvh.pre_update_or_insert(handle);
             }
 
             /// Remove a fixed body from the world
             pub fn $remove(&mut self, body: Arc<$body_type>) {
                 if let Some(handle) = self.$body_set.remove(body) {
                     self.handles.remove(&handle);
-                    self.qbvh.remove(handle);
+                    //self.qbvh.remove(handle);
                 }
             }
         }
@@ -154,4 +172,57 @@ impl_for_body_set! {
 // Implement methods for kinematic bodies
 impl_for_body_set! {
     kinematic_set[KinematicBody] as (add_kinematic, remove_kinematic)
+}
+
+// Expose some methods from the underlying vector
+impl World {
+    // delegate methods for static bodies set
+    delegate! {
+        to self.static_set {
+            #[call(reserve)]
+            pub fn reserve_statics(&mut self, additional: usize);
+            #[call(reserve_exact)]
+            pub fn reserve_exact_statics(&mut self, additional: usize);
+            #[call(shrink_to_fit)]
+            pub fn shrink_to_fit_statics(&mut self);
+            #[call(shrink_to)]
+            pub fn shrink_to_statics(&mut self, min_capacity: usize);
+            #[call(iter)]
+            pub fn iter_statics(&self) -> impl Iterator<Item = &Arc<StaticBody>>;
+        }
+    }
+
+    // delegate methods for kinematic bodies set
+    delegate! {
+        to self.kinematic_set {
+            #[call(reserve)]
+            pub fn reserve_kinematics(&mut self, additional: usize);
+            #[call(reserve_exact)]
+            pub fn reserve_exact_kinematics(&mut self, additional: usize);
+            #[call(shrink_to_fit)]
+            pub fn shrink_to_fit_kinematics(&mut self);
+            #[call(shrink_to)]
+            pub fn shrink_to_kinematics(&mut self, min_capacity: usize);
+            #[call(iter)]
+            pub fn iter_kinematics(&self) -> impl Iterator<Item = &Arc<KinematicBody>>;
+            #[call(iter_mut)]
+            pub fn iter_mut_kinematics(&mut self) -> impl Iterator<Item = &mut Arc<KinematicBody>>;
+        }
+    }
+
+    // delegate methods for trigger areas set
+    delegate! {
+        to self.trigger_set {
+            #[call(reserve)]
+            pub fn reserve_triggers(&mut self, additional: usize);
+            #[call(reserve_exact)]
+            pub fn reserve_exact_triggers(&mut self, additional: usize);
+            #[call(shrink_to_fit)]
+            pub fn shrink_to_fit_triggers(&mut self);
+            #[call(shrink_to)]
+            pub fn shrink_to_triggers(&mut self, min_capacity: usize);
+            #[call(iter)]
+            pub fn iter_triggers(&self) -> impl Iterator<Item = &Arc<TriggerArea>>;
+        }
+    }
 }

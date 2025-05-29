@@ -30,6 +30,20 @@ pub struct KinematicBody {
     mask: Mask,
 }
 
+impl KinematicBody {
+    /// Create a new kinematic body
+    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, layer: Mask, mask: Mask) -> Self {
+        Self {
+            shape,
+            isometry,
+            velocity: Vector::zeros(),
+            next_isometry: isometry,
+            layer,
+            mask,
+        }
+    }
+}
+
 impl Object for KinematicBody {
     #[inline]
     fn shape(&self) -> &dyn Shape {

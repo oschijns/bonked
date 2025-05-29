@@ -21,6 +21,17 @@ pub struct StaticBody {
     layer: Mask,
 }
 
+impl StaticBody {
+    /// Build a new static body
+    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, layer: Mask) -> Self {
+        Self {
+            shape,
+            isometry,
+            layer,
+        }
+    }
+}
+
 impl Object for StaticBody {
     #[inline]
     fn shape(&self) -> &dyn Shape {

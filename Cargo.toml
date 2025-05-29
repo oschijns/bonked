@@ -12,9 +12,3 @@ edition = "2021"
 [patch.crates-io]
 bonked2d = { path = "crates/bonked2d" }
 bonked3d = { path = "crates/bonked3d" }
-
-
-[workspace.dev-dependencies]
-
-# Quick rendering
-macroquad = "4.14"

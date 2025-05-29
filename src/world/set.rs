@@ -4,10 +4,40 @@
 
 use crate::object::{handle::Handle, Object};
 use alloc::{sync::Arc, vec::Vec};
+use delegate::delegate;
 
 /// Store a set of elements
-#[derive(Default)]
 pub struct Set<O>(pub(crate) Vec<Arc<O>>);
+
+/// Create a new empty set
+impl<O> Default for Set<O> {
+    #[inline]
+    fn default() -> Self {
+        Self(Vec::default())
+    }
+}
+
+impl<O> Set<O> {
+    /// Create a new empty set with a predefined capacity
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    // Expose some methods from the underlying vector
+    delegate! {
+        to self.0 {
+            pub fn len(&self) -> usize;
+            pub fn is_empty(&self) -> bool;
+            pub fn reserve(&mut self, additional: usize);
+            pub fn reserve_exact(&mut self, additional: usize);
+            pub fn shrink_to_fit(&mut self);
+            pub fn shrink_to(&mut self, min_capacity: usize);
+            pub fn iter(&self) -> impl Iterator<Item = &Arc<O>>;
+            pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Arc<O>>;
+        }
+    }
+}
 
 impl<O> Set<O>
 where

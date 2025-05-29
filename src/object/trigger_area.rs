@@ -21,6 +21,17 @@ pub struct TriggerArea {
     mask: Mask,
 }
 
+impl TriggerArea {
+    /// Create a new trigger area
+    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, mask: Mask) -> Self {
+        Self {
+            shape,
+            isometry,
+            mask,
+        }
+    }
+}
+
 impl Object for TriggerArea {
     #[inline]
     fn shape(&self) -> &dyn Shape {

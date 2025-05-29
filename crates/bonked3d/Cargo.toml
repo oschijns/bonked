@@ -63,3 +63,14 @@ hashbrown = { version = "0.15", features = [
     "equivalent",
     "raw-entry",
 ], default-features = false, optional = true }
+
+# Delegate methods from internal fields
+delegate = "0.13"
+
+# Dependencies for examples
+[dev-dependencies]
+
+# Quick rendering
+macroquad = "0.4"
+
+rapier3d = "0.26"
