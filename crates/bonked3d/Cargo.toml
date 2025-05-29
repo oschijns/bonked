@@ -18,10 +18,10 @@ mask-u32 = []
 mask-u64 = []
 
 # enable support for the standard library
-std = ["parry3d?/std", "parry3d-f64?/std"]
+std = ["parry3d?/std", "parry3d-f64?/std", "bvh-arena/std", "spin/std"]
 
 # enable support for alloc
-alloc = ["parry3d?/alloc", "parry3d-f64?/alloc", "dep:hashbrown"]
+alloc = ["parry3d?/alloc", "parry3d-f64?/alloc"]
 
 # enable support for Single Instruction Multiple Data
 simd = ["parry3d?/simd-stable", "parry3d-f64?/simd-stable"]
@@ -46,6 +46,12 @@ path = "../../src/lib.rs"
 # Dependencies
 [dependencies]
 
+# Mutable access to shared references
+spin = "0.10"
+
+# Broadphase
+bvh-arena = { version = "1.1", default-features = false }
+
 # Collision Detection
 parry3d = { version = "0.19", features = [
     "required-features",
@@ -54,14 +60,6 @@ parry3d = { version = "0.19", features = [
 parry3d-f64 = { version = "0.19", features = [
     "required-features",
     "alloc",
-], default-features = false, optional = true }
-
-# HashMap & HashSet
-hashbrown = { version = "0.15", features = [
-    "default-hasher",
-    "allocator-api2",
-    "equivalent",
-    "raw-entry",
 ], default-features = false, optional = true }
 
 # Delegate methods from internal fields

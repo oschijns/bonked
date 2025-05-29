@@ -1,9 +1,9 @@
 use bonked3d::{
+    make_shared,
     object::{kinematic_body::KinematicBody, static_body::StaticBody, Object},
     world::World,
 };
 use macroquad::prelude::*;
-use parry3d::partitioning::IndexedData;
 use parry3d::{
     math::{Isometry, Point, Vector},
     shape::{Capsule, Cuboid, Shape},
@@ -35,23 +35,21 @@ async fn main() {
         });
 
         draw_grid(20, 1., BLACK, GRAY);
-        for astatic in world.iter_statics() {
-            let pos = to_vec3(astatic.isometry().translation.vector);
-            let size = to_vec3(astatic.shape().as_cuboid().unwrap().half_extents) * 2.0;
+        for astatic in world.statics().iter() {
+            let s = astatic.read();
+            let pos = to_vec3(s.isometry().translation.vector);
+            let size = to_vec3(s.shape().as_cuboid().unwrap().half_extents) * 2.0;
             draw_cube_wires(pos, size, BLUE);
         }
 
-        for abody in world.iter_kinematics() {
-            let pos = to_vec3(abody.isometry().translation.vector);
-            let cap = abody.shape().as_capsule().unwrap();
+        for kinematic in world.kinematics().iter() {
+            let k = kinematic.read();
+            let pos = to_vec3(k.isometry().translation.vector);
+            let cap = k.shape().as_capsule().unwrap();
             draw_cylinder_wires(pos, cap.radius, cap.radius, cap.height(), None, RED);
         }
 
-        for handle in world.handles.iter() {
-            println!("handle: {}", handle.index());
-        }
-
-        world.update();
+        //world.update();
 
         next_frame().await
     }
@@ -59,23 +57,17 @@ async fn main() {
 
 fn build_world() -> World {
     let mut world = World::with_capacity(1, 1, 0);
-    world.add_static(
-        StaticBody::new(
-            new_box(20.0, 1.0, 20.0),
-            Isometry::new(Vector::new(0.0, 0.0, 0.0), Vector::zeros()),
-            u32::MAX,
-        )
-        .into(),
-    );
-    world.add_kinematic(
-        KinematicBody::new(
-            new_capsule(1.0, 2.0),
-            Isometry::new(Vector::new(0.0, 1.0, 0.0), Vector::zeros()),
-            1,
-            u32::MAX,
-        )
-        .into(),
-    );
+    world.add_static(make_shared(StaticBody::new(
+        new_box(20.0, 1.0, 20.0),
+        Isometry::new(Vector::new(0.0, 0.0, 0.0), Vector::zeros()),
+        u32::MAX,
+    )));
+    world.add_kinematic(make_shared(KinematicBody::new(
+        new_capsule(1.0, 2.0),
+        Isometry::new(Vector::new(0.0, 1.0, 0.0), Vector::zeros()),
+        1,
+        u32::MAX,
+    )));
     world
 }
 

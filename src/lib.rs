@@ -43,14 +43,13 @@ pub type Mask = u32;
 #[cfg(feature = "mask-u64")]
 pub type Mask = u64;
 
-// pick hashset and hashmap based on feature flags
+use alloc::sync::Arc;
+use spin::RwLock;
 
-#[cfg(feature = "std")]
-pub mod collections {
-    pub use std::collections::{HashMap, HashSet};
-}
+/// Shared reference with a read-write lock
+pub type Shared<O> = Arc<RwLock<O>>;
 
-#[cfg(not(feature = "std"))]
-pub mod collections {
-    pub use hashbrown::{HashMap, HashSet};
+/// Create a shared reference with a read-write lock
+pub fn make_shared<O>(object: O) -> Shared<O> {
+    Arc::new(RwLock::new(object))
 }

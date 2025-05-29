@@ -1,9 +1,11 @@
 //! Trigger zone which detect intersection with kinematic bodies
 
-use super::{kinematic_body::KinematicBody, Mask, Object};
+use super::{kinematic_body::KinematicBody, CommonData, Mask, Object, MASK_ALL};
+use crate::world::aabb::Aabb;
 use alloc::sync::Arc;
+use bvh_arena::VolumeHandle;
+use delegate::delegate;
 use parry::{
-    bounding_volume::Aabb,
     math::{Isometry, Real},
     query::intersection_test,
     shape::Shape,
@@ -11,11 +13,8 @@ use parry::{
 
 /// A trigger zone in the world
 pub struct TriggerArea {
-    /// Collision shape used by this zone
-    shape: Arc<dyn Shape>,
-
-    /// Isometry (transform) of the zone
-    isometry: Isometry<Real>,
+    /// Shape, isometry and handle
+    common: CommonData,
 
     /// Layers this trigger zone can detect objects on
     mask: Mask,
@@ -23,36 +22,34 @@ pub struct TriggerArea {
 
 impl TriggerArea {
     /// Create a new trigger area
+    #[inline]
     pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, mask: Mask) -> Self {
         Self {
-            shape,
-            isometry,
+            common: CommonData::new(shape, isometry),
             mask,
         }
     }
 }
 
 impl Object for TriggerArea {
-    #[inline]
-    fn shape(&self) -> &dyn Shape {
-        self.shape.as_ref()
-    }
-
-    #[inline]
-    fn isometry(&self) -> &Isometry<f32> {
-        &self.isometry
+    delegate! {
+        to self.common {
+            fn set_handle(&mut self, handle: VolumeHandle);
+            fn unset_handle(&mut self);
+            fn handle(&self) -> Option<VolumeHandle>;
+            fn shape(&self) -> &dyn Shape;
+            fn isometry(&self) -> &Isometry<f32>;
+        }
     }
 
     /// Compute the AABB of this trigger zone
     #[inline]
     fn aabb(&self) -> Aabb {
-        self.shape.compute_aabb(&self.isometry)
-    }
-
-    /// Check if this trigger can detect the given body
-    #[inline]
-    fn layer_match(&self, other: &dyn Object) -> bool {
-        self.mask & other.layer() != 0
+        Aabb::new(
+            self.common.shape.compute_aabb(&self.common.isometry),
+            MASK_ALL,
+            self.mask,
+        )
     }
 
     #[inline]
@@ -67,7 +64,7 @@ impl TriggerArea {
         intersection_test(
             kinematic.isometry(),
             kinematic.shape(),
-            &self.isometry,
+            &self.isometry(),
             self.shape(),
         )
         .unwrap_or(false)

@@ -3,226 +3,169 @@
 /// Collection of objects
 pub mod set;
 
-use super::object::{
-    handle::Handle, kinematic_body::KinematicBody, static_body::StaticBody,
-    trigger_area::TriggerArea, Object,
+/// Axis-Aligned Bounding Box (AABB)
+pub mod aabb;
+
+use crate::{
+    object::{
+        kinematic_body::KinematicBody, static_body::StaticBody, trigger_area::TriggerArea, Object,
+    },
+    Shared,
 };
-use crate::collections::HashSet;
-use alloc::{sync::Arc, vec::Vec};
-use delegate::delegate;
-use parry::{
-    math::Real,
-    partitioning::{Qbvh, QbvhUpdateWorkspace},
-    query::visitors::BoundingVolumeIntersectionsSimultaneousVisitor,
-};
+use parry::{math::Real, query::ShapeCastOptions};
 use set::Set;
 
 /// Define a physics world
 #[derive(Default)]
 pub struct World {
-    /// Store the list of trigger areas
-    trigger_set: Set<TriggerArea>,
+    /// Store the list of kinematic bodies
+    kinematic_set: Set<KinematicBody>,
 
     /// Store the list of static bodies
     static_set: Set<StaticBody>,
 
-    /// Store the list of kinematic bodies
-    kinematic_set: Set<KinematicBody>,
-
-    /// List of the handles
-    pub handles: HashSet<Handle>,
-
-    /// Broadphase resolution
-    qbvh: Qbvh<Handle>,
-
-    /// Workspace for the world
-    workspace: QbvhUpdateWorkspace,
-
-    /// Stack to store stuff?
-    stack: Vec<(u32, u32)>,
-
-    /// Margin for broadphase resolution
-    margin: Real,
+    /// Store the list of trigger areas
+    trigger_set: Set<TriggerArea>,
 }
 
 impl World {
-    /// Create a new empty world with a predefined capacity
-    pub fn with_capacity(cap_static: usize, cap_kinematic: usize, cap_trigger: usize) -> Self {
+    /// Create a new world
+    pub fn new() -> Self {
         Self {
-            static_set: Set::with_capacity(cap_static),
+            kinematic_set: Set::default(),
+            static_set: Set::default(),
+            trigger_set: Set::default(),
+        }
+    }
+
+    /// Create a new empty world with a predefined capacity
+    pub fn with_capacity(cap_kinematic: usize, cap_static: usize, cap_trigger: usize) -> Self {
+        Self {
             kinematic_set: Set::with_capacity(cap_kinematic),
+            static_set: Set::with_capacity(cap_static),
             trigger_set: Set::with_capacity(cap_trigger),
-            handles: HashSet::with_capacity(cap_static + cap_kinematic + cap_trigger),
-            qbvh: Qbvh::new(),
-            workspace: QbvhUpdateWorkspace::default(),
-            stack: Vec::new(),
-            margin: Real::EPSILON,
         }
     }
 
-    //*
-    /// Proceed to the broadphase
-    pub fn update(&mut self) {
-        // Count the total number of kinematic bodies in the physics world
-        let count = self.kinematic_set.len();
+    /// Update the state of the world
+    pub fn update(&mut self, delta_time: Real) {
+        // Check collisions between kinematic bodies and static bodies
+        for kinematic in self.kinematic_set.iter_mut() {
+            // prepare the  kinematic body for current update
+            let mut mut_kine = kinematic.write();
+            mut_kine.pre_update(delta_time);
+            let aabb = mut_kine.aabb();
 
-        // This section is inspired by rapier's implementation
-        // https://docs.rs/rapier3d/0.26.0/src/rapier3d/geometry/broad_phase_qbvh.rs.html
+            // check for collisions with static bodies
+            self.static_set
+                .partition
+                .for_each_overlaps(&aabb, |astatic| {
+                    // if there is a contact between the two bodies,
+                    // apply the result to the kinematic body
+                    if let Some(contact) = astatic.read().collides_with(&mut_kine) {
+                        mut_kine.apply_contact(&contact);
+                    }
+                });
+        }
 
-        // Define set for each of the various collision types
-        let mut intersect = Vec::with_capacity(count);
-        let mut coll_s = Vec::with_capacity(count);
-        let mut coll_k = Vec::with_capacity(count);
+        // Options for kinematic bodies collisions
+        let options = ShapeCastOptions::with_max_time_of_impact(delta_time);
 
-        // Visitor to find collision pairs
-        let mut visitor =
-            BoundingVolumeIntersectionsSimultaneousVisitor::new(|h1: &Handle, h2: &Handle| {
-                match (h1, h2) {
-                    (Handle::Trigger(t), Handle::Kinematic(k))
-                    | (Handle::Kinematic(k), Handle::Trigger(t)) => {
-                        let trigger = unsafe { t.as_ref() }.unwrap();
-                        let k_body = unsafe { k.as_ref() }.unwrap();
-                        if trigger.layer_match(k_body) {
-                            intersect.push((trigger, k_body));
-                        }
-                    }
-                    (Handle::Static(s), Handle::Kinematic(k))
-                    | (Handle::Kinematic(k), Handle::Static(s)) => {
-                        let s_body = unsafe { s.as_ref() }.unwrap();
-                        let k_body = unsafe { k.as_ref() }.unwrap();
-                        if s_body.layer_match(k_body) {
-                            coll_s.push((s_body, k_body));
-                        }
-                    }
-                    (Handle::Kinematic(k1), Handle::Kinematic(k2)) => {
-                        let kine1 = unsafe { k1.as_ref() }.unwrap();
-                        let kine2 = unsafe { k2.as_ref() }.unwrap();
-                        if kine1.layer_match(kine2) {
-                            coll_k.push((kine1, kine2));
-                        }
-                    }
-                    _ => {}
+        // Check collisions inbetween kinematic bodies
+        self.kinematic_set.repartition();
+        self.kinematic_set
+            .partition
+            .for_each_overlaping_pair(|kinematic1, kinematic2| {
+                // get mutable access to both bodies
+                let mut mut_k1 = kinematic1.write();
+                let mut mut_k2 = kinematic2.write();
+                if let Some(collision) = mut_k1.collides_with(&mut_k2, options) {
+                    mut_k1.apply_collision(&collision);
+                    mut_k2.apply_collision(&collision.swapped());
                 }
-                true
             });
 
-        // check if we need to perform a full rewrite
-        let full_rebuild = self.qbvh.raw_nodes().is_empty();
-        if full_rebuild {
-            // Rebuild all the AABBs
-            self.qbvh.clear_and_rebuild(
-                self.handles.iter().map(|handle| {
-                    let aabb = handle.as_dyn().aabb();
-                    (*handle, aabb)
-                }),
-                self.margin,
-            );
-
-            // traverse
-            self.qbvh
-                .traverse_bvtt_with_stack(&self.qbvh, &mut visitor, &mut self.stack);
-        } else {
-            // update the AABB of the colliders that have been modified
-            let _ = self.qbvh.refit(self.margin, &mut self.workspace, |handle| {
-                handle.as_dyn().aabb()
-            });
-
-            // traverse
-            self.qbvh
-                .traverse_modified_bvtt_with_stack(&self.qbvh, &mut visitor, &mut self.stack);
-            self.qbvh.rebalance(self.margin, &mut self.workspace);
-        }
-
-        // TODO: perform the narrow phase
-    }
-    // */
-}
-
-macro_rules! impl_for_body_set {
-    ( $body_set:ident [$body_type:ty] as ( $add:ident, $remove:ident ) ) => {
-        impl World {
-            /// Add a fixed body to the world
-            pub fn $add(&mut self, body: Arc<$body_type>) {
-                let handle = self.$body_set.add(body);
-                self.handles.insert(handle);
-                //self.qbvh.pre_update_or_insert(handle);
-            }
-
-            /// Remove a fixed body from the world
-            pub fn $remove(&mut self, body: Arc<$body_type>) {
-                if let Some(handle) = self.$body_set.remove(body) {
-                    self.handles.remove(&handle);
-                    //self.qbvh.remove(handle);
-                }
-            }
-        }
-    };
-}
-
-// Implement methods for trigger areas
-impl_for_body_set! {
-    trigger_set[TriggerArea] as (add_trigger, remove_trigger)
-}
-
-// Implement methods for static bodies
-impl_for_body_set! {
-    static_set[StaticBody] as (add_static, remove_static)
-}
-
-// Implement methods for kinematic bodies
-impl_for_body_set! {
-    kinematic_set[KinematicBody] as (add_kinematic, remove_kinematic)
-}
-
-// Expose some methods from the underlying vector
-impl World {
-    // delegate methods for static bodies set
-    delegate! {
-        to self.static_set {
-            #[call(reserve)]
-            pub fn reserve_statics(&mut self, additional: usize);
-            #[call(reserve_exact)]
-            pub fn reserve_exact_statics(&mut self, additional: usize);
-            #[call(shrink_to_fit)]
-            pub fn shrink_to_fit_statics(&mut self);
-            #[call(shrink_to)]
-            pub fn shrink_to_statics(&mut self, min_capacity: usize);
-            #[call(iter)]
-            pub fn iter_statics(&self) -> impl Iterator<Item = &Arc<StaticBody>>;
+        // Check intersections between kinematic bodies and trigger areas
+        for kinematic in self.kinematic_set.iter_mut() {
+            // mutable access to the kinematic body
+            let mut mut_kine = kinematic.write();
+            let aabb = mut_kine.aabb();
+            // check for intersections with trigger areas
+            self.trigger_set
+                .partition
+                .for_each_overlaps(&aabb, |atrigger| {
+                    // if there is an intersection between the two areas,
+                    // apply the result to the kinematic body
+                    if atrigger.read().intersects_with(&mut_kine) {
+                        // TODO
+                    }
+                });
         }
     }
 
-    // delegate methods for kinematic bodies set
-    delegate! {
-        to self.kinematic_set {
-            #[call(reserve)]
-            pub fn reserve_kinematics(&mut self, additional: usize);
-            #[call(reserve_exact)]
-            pub fn reserve_exact_kinematics(&mut self, additional: usize);
-            #[call(shrink_to_fit)]
-            pub fn shrink_to_fit_kinematics(&mut self);
-            #[call(shrink_to)]
-            pub fn shrink_to_kinematics(&mut self, min_capacity: usize);
-            #[call(iter)]
-            pub fn iter_kinematics(&self) -> impl Iterator<Item = &Arc<KinematicBody>>;
-            #[call(iter_mut)]
-            pub fn iter_mut_kinematics(&mut self) -> impl Iterator<Item = &mut Arc<KinematicBody>>;
-        }
+    /// Add a kinematic body to the world
+    #[inline]
+    pub fn add_kinematic(&mut self, body: Shared<KinematicBody>) {
+        self.kinematic_set.store(body); // don't update the partition here
     }
 
-    // delegate methods for trigger areas set
-    delegate! {
-        to self.trigger_set {
-            #[call(reserve)]
-            pub fn reserve_triggers(&mut self, additional: usize);
-            #[call(reserve_exact)]
-            pub fn reserve_exact_triggers(&mut self, additional: usize);
-            #[call(shrink_to_fit)]
-            pub fn shrink_to_fit_triggers(&mut self);
-            #[call(shrink_to)]
-            pub fn shrink_to_triggers(&mut self, min_capacity: usize);
-            #[call(iter)]
-            pub fn iter_triggers(&self) -> impl Iterator<Item = &Arc<TriggerArea>>;
-        }
+    /// Remove a kinematic body from the world
+    #[inline]
+    pub fn remove_kinematic(&mut self, body: &Shared<KinematicBody>) {
+        self.kinematic_set.quick_remove(body);
+    }
+
+    /// Add a static body to the world
+    #[inline]
+    pub fn add_static(&mut self, body: Shared<StaticBody>) {
+        self.static_set.add(body);
+    }
+
+    /// Remove a static body from the world
+    #[inline]
+    pub fn remove_static(&mut self, body: &Shared<StaticBody>) {
+        self.static_set.clean_remove(body);
+    }
+
+    /// Add a trigger area to the world
+    #[inline]
+    pub fn add_trigger(&mut self, area: Shared<TriggerArea>) {
+        self.trigger_set.add(area);
+    }
+
+    /// Remove a trigger area from the world
+    #[inline]
+    pub fn remove_trigger(&mut self, area: &Shared<TriggerArea>) {
+        self.trigger_set.clean_remove(area);
+    }
+
+    /// Access the set of kinematic bodies
+    pub fn kinematics(&self) -> &Set<KinematicBody> {
+        &self.kinematic_set
+    }
+
+    /// Access the set of static bodies
+    pub fn statics(&self) -> &Set<StaticBody> {
+        &self.static_set
+    }
+
+    /// Access the set of trigger areas
+    pub fn triggers(&self) -> &Set<TriggerArea> {
+        &self.trigger_set
+    }
+
+    /// Mutable access the set of kinematic bodies
+    pub fn kinematics_mut(&mut self) -> &mut Set<KinematicBody> {
+        &mut self.kinematic_set
+    }
+
+    /// Mutable access the set of static bodies
+    pub fn statics_mut(&mut self) -> &mut Set<StaticBody> {
+        &mut self.static_set
+    }
+
+    /// Mutable access the set of trigger areas
+    pub fn triggers_mut(&mut self) -> &mut Set<TriggerArea> {
+        &mut self.trigger_set
     }
 }

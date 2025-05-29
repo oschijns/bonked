@@ -1,9 +1,11 @@
 //! Fixed body which does not report collisions
 
-use super::{kinematic_body::KinematicBody, Mask, Object};
+use super::{kinematic_body::KinematicBody, CommonData, Mask, Object, MASK_ALL};
+use crate::world::aabb::Aabb;
 use alloc::sync::Arc;
+use bvh_arena::VolumeHandle;
+use delegate::delegate;
 use parry::{
-    bounding_volume::Aabb,
     math::{Isometry, Real},
     query::{contact, Contact},
     shape::Shape,
@@ -11,11 +13,8 @@ use parry::{
 
 /// A fixed body in the world
 pub struct StaticBody {
-    /// Collision shape used by this body
-    shape: Arc<dyn Shape>,
-
-    /// Isometry (transform) of the body
-    isometry: Isometry<Real>,
+    /// Shape, isometry and handle
+    common: CommonData,
 
     /// Specify the layer this body belongs to
     layer: Mask,
@@ -23,36 +22,34 @@ pub struct StaticBody {
 
 impl StaticBody {
     /// Build a new static body
+    #[inline]
     pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, layer: Mask) -> Self {
         Self {
-            shape,
-            isometry,
+            common: CommonData::new(shape, isometry),
             layer,
         }
     }
 }
 
 impl Object for StaticBody {
-    #[inline]
-    fn shape(&self) -> &dyn Shape {
-        self.shape.as_ref()
-    }
-
-    #[inline]
-    fn isometry(&self) -> &Isometry<f32> {
-        &self.isometry
+    delegate! {
+        to self.common {
+            fn set_handle(&mut self, handle: VolumeHandle);
+            fn unset_handle(&mut self);
+            fn handle(&self) -> Option<VolumeHandle>;
+            fn shape(&self) -> &dyn Shape;
+            fn isometry(&self) -> &Isometry<f32>;
+        }
     }
 
     /// Compute the AABB of this fixed body
     #[inline]
     fn aabb(&self) -> Aabb {
-        self.shape.compute_aabb(&self.isometry)
-    }
-
-    /// Check that the other body detect collision on the layer this fixed body is
-    #[inline]
-    fn layer_match(&self, other: &dyn Object) -> bool {
-        self.layer & other.mask() != 0
+        Aabb::new(
+            self.common.shape.compute_aabb(&self.common.isometry),
+            self.layer,
+            MASK_ALL,
+        )
     }
 
     #[inline]
@@ -68,7 +65,7 @@ impl StaticBody {
         contact(
             kinematic.next_isometry(),
             kinematic.shape(),
-            &self.isometry,
+            &self.isometry(),
             self.shape(),
             0.0,
         )

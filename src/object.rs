@@ -1,26 +1,40 @@
 //! Simple physics engine for the game
 
-/// Handles for physics objects
-pub mod handle;
+/// Kinematic body
+pub mod kinematic_body;
 
 /// Static body
 pub mod static_body;
 
-/// Kinematic body
-pub mod kinematic_body;
-
 /// Trigger area
 pub mod trigger_area;
 
+/// Utilities
+pub mod utils;
+
 use super::Mask;
+use crate::world::aabb::Aabb;
+use alloc::sync::Arc;
+use bvh_arena::VolumeHandle;
 use parry::{
-    bounding_volume::Aabb,
     math::{Isometry, Real},
     shape::Shape,
 };
 
+/// Mask where all bits are set to 1
+const MASK_ALL: Mask = Mask::MAX;
+
 /// Trait implemented for static and dynamic bodies
 pub trait Object {
+    /// Store the handle of this object after it has been added to the world
+    fn set_handle(&mut self, handle: VolumeHandle);
+
+    /// Unset the handle of this object
+    fn unset_handle(&mut self);
+
+    /// Access the handle of this object
+    fn handle(&self) -> Option<VolumeHandle>;
+
     /// Access the shape assigned to this body
     fn shape(&self) -> &dyn Shape;
 
@@ -30,18 +44,77 @@ pub trait Object {
     /// Create an Axis-Aligned Bounding Box for this body
     fn aabb(&self) -> Aabb;
 
-    /// Check if the collision layer matches with the other body
-    fn layer_match(&self, other: &dyn Object) -> bool;
-
     /// Get the layer(s) this body belongs to
     #[inline]
     fn layer(&self) -> Mask {
-        0
+        MASK_ALL
     }
 
     /// Get the layers this body can interact with
     #[inline]
     fn mask(&self) -> Mask {
-        0
+        MASK_ALL
+    }
+}
+
+/// Common data shared between static and dynamic bodies
+struct CommonData {
+    /// Handle of this body in the world
+    handle: Option<VolumeHandle>,
+
+    /// Collision shape used by this zone
+    shape: Arc<dyn Shape>,
+
+    /// Isometry of this body
+    isometry: Isometry<Real>,
+}
+
+impl CommonData {
+    /// Create a new common data instance
+    #[inline]
+    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>) -> Self {
+        CommonData {
+            handle: None,
+            shape,
+            isometry,
+        }
+    }
+}
+
+impl Object for CommonData {
+    /// Store the handle of this object after it has been added to the world
+    #[inline]
+    fn set_handle(&mut self, handle: VolumeHandle) {
+        self.handle = Some(handle);
+    }
+
+    /// Unset the handle of this object
+    #[inline]
+    fn unset_handle(&mut self) {
+        self.handle = None;
+    }
+
+    /// Access the handle of this object
+    #[inline]
+    fn handle(&self) -> Option<VolumeHandle> {
+        self.handle
+    }
+
+    /// Access the shape assigned to this body
+    #[inline]
+    fn shape(&self) -> &dyn Shape {
+        self.shape.as_ref()
+    }
+
+    /// Access the isometry of this shape
+    #[inline]
+    fn isometry(&self) -> &Isometry<f32> {
+        &self.isometry
+    }
+
+    /// Build a generic AABB for this body
+    #[inline]
+    fn aabb(&self) -> Aabb {
+        Aabb::new(self.shape.compute_aabb(&self.isometry), MASK_ALL, MASK_ALL)
     }
 }

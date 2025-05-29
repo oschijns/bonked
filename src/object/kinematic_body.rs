@@ -1,21 +1,26 @@
 //! Kinematic body which reports collisions
 
-use super::{Mask, Object};
+use super::{utils::Accumulator, CommonData, Mask, Object};
+use crate::world::aabb::Aabb;
 use alloc::sync::Arc;
+use bvh_arena::VolumeHandle;
+use delegate::delegate;
 use parry::{
-    bounding_volume::Aabb,
     math::{Isometry, Real, Translation, Vector},
-    query::{cast_shapes, ShapeCastHit, ShapeCastOptions},
+    query::{cast_shapes, Contact, ShapeCastHit, ShapeCastOptions},
     shape::Shape,
 };
 
 /// A kinematic body in the world
 pub struct KinematicBody {
-    /// Collision shape used by this body
-    shape: Arc<dyn Shape>,
+    /// Shape, isometry and handle
+    common: CommonData,
 
-    /// Isometry (transform) of the body
-    isometry: Isometry<Real>,
+    /// Collision layer of the body
+    layer: Mask,
+
+    /// Collision mask of the body
+    mask: Mask,
 
     /// Velocity of the object
     velocity: Vector<Real>,
@@ -23,48 +28,45 @@ pub struct KinematicBody {
     /// Target isometry at the next tick
     next_isometry: Isometry<Real>,
 
-    /// Collision layer of the body
-    layer: Mask,
-
-    /// Collision mask of the body
-    mask: Mask,
+    /// Accumulator for correcting the position of the body
+    accumulator: Accumulator,
 }
 
 impl KinematicBody {
     /// Create a new kinematic body
     pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, layer: Mask, mask: Mask) -> Self {
         Self {
-            shape,
-            isometry,
-            velocity: Vector::zeros(),
-            next_isometry: isometry,
+            common: CommonData::new(shape, isometry),
             layer,
             mask,
+            velocity: Vector::zeros(),
+            next_isometry: isometry,
+            accumulator: Accumulator::default(),
         }
     }
 }
 
 impl Object for KinematicBody {
-    #[inline]
-    fn shape(&self) -> &dyn Shape {
-        self.shape.as_ref()
-    }
-
-    #[inline]
-    fn isometry(&self) -> &Isometry<f32> {
-        &self.isometry
+    delegate! {
+        to self.common {
+            fn set_handle(&mut self, handle: VolumeHandle);
+            fn unset_handle(&mut self);
+            fn handle(&self) -> Option<VolumeHandle>;
+            fn shape(&self) -> &dyn Shape;
+            fn isometry(&self) -> &Isometry<f32>;
+        }
     }
 
     /// Compute the AABB of this moving body
     #[inline]
     fn aabb(&self) -> Aabb {
-        self.shape
-            .compute_swept_aabb(&self.isometry, &self.next_isometry)
-    }
-
-    /// Check the two bodies match along layers and mask
-    fn layer_match(&self, other: &dyn Object) -> bool {
-        self.layer & other.mask() != 0 && self.mask & other.layer() != 0
+        Aabb::new(
+            self.common
+                .shape
+                .compute_swept_aabb(&self.common.isometry, &self.next_isometry),
+            self.layer,
+            self.mask,
+        )
     }
 
     #[inline]
@@ -82,7 +84,7 @@ impl KinematicBody {
     /// Compute the estimated next isometry by applying the velocity
     pub fn pre_update(&mut self, delta_time: Real) {
         // submit the computed new isometry
-        self.isometry = self.next_isometry;
+        self.common.isometry = self.next_isometry;
 
         // Now move the estimated next isometry to
         // its expected location based on the velocity.
@@ -104,14 +106,23 @@ impl KinematicBody {
     ) -> Option<ShapeCastHit> {
         // Check if the two objects will collide
         cast_shapes(
-            &self.isometry,
+            &self.isometry(),
             &self.velocity,
             self.shape(),
-            &other.isometry,
+            &other.isometry(),
             &other.velocity,
             other.shape(),
             options,
         )
         .unwrap_or(None)
     }
+
+    /// Apply contact to this kinematic body
+    pub fn apply_contact(&mut self, contact: &Contact) {
+        self.accumulator
+            .add_collision(&contact.point2, &contact.normal2, contact.dist);
+    }
+
+    /// Apply collision from other kinematic body to this body
+    pub fn apply_collision(&mut self, collision: &ShapeCastHit) {}
 }
