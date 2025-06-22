@@ -5,13 +5,15 @@ use bonked3d::{
 };
 use macroquad::prelude::*;
 use parry3d::{
-    math::{Isometry, Point, Vector},
+    math::{Isometry, Point, Real, Vector},
     shape::{Capsule, Cuboid, Shape},
 };
 use std::sync::Arc;
 
 #[macroquad::main("3D")]
 async fn main() {
+    const EPSILON: Real = 0.0001;
+
     let camera_speed = 30.0f32.to_radians();
     let mut cam_ang = 0.0f32;
 
@@ -49,7 +51,7 @@ async fn main() {
             draw_cylinder_wires(pos, cap.radius, cap.radius, cap.height(), None, RED);
         }
 
-        //world.update();
+        world.update(delta, EPSILON);
 
         next_frame().await
     }
@@ -65,6 +67,7 @@ fn build_world() -> World {
     world.add_kinematic(make_shared(KinematicBody::new(
         new_capsule(1.0, 2.0),
         Isometry::new(Vector::new(0.0, 1.0, 0.0), Vector::zeros()),
+        1.0,
         1,
         u32::MAX,
     )));

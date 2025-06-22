@@ -9,15 +9,13 @@ pub mod static_body;
 /// Trigger area
 pub mod trigger_area;
 
-/// Utilities
-pub mod utils;
-
 use super::Mask;
 use crate::world::aabb::Aabb;
 use alloc::sync::Arc;
 use bvh_arena::VolumeHandle;
 use parry::{
-    math::{Isometry, Real},
+    math::{Isometry, Real, Vector},
+    query::{self, Contact, ShapeCastHit, ShapeCastOptions},
     shape::Shape,
 };
 
@@ -54,6 +52,12 @@ pub trait Object {
     #[inline]
     fn mask(&self) -> Mask {
         MASK_ALL
+    }
+
+    /// Get the velocity of the body (if it has one)
+    #[inline]
+    fn velocity(&self) -> Vector<Real> {
+        Vector::default()
     }
 }
 
@@ -117,4 +121,43 @@ impl Object for CommonData {
     fn aabb(&self) -> Aabb {
         Aabb::new(self.shape.compute_aabb(&self.isometry), MASK_ALL, MASK_ALL)
     }
+}
+
+/// Check if two objects intersects
+#[inline]
+pub fn intersects<A, B>(a: &A, b: &B) -> bool
+where
+    A: Object,
+    B: Object,
+{
+    query::intersection_test(a.isometry(), a.shape(), b.isometry(), b.shape()).unwrap_or(false)
+}
+
+/// Check if two objects are in contact
+#[inline]
+pub fn contacts<A, B>(a: &A, b: &B, prediction: Real) -> Option<Contact>
+where
+    A: Object,
+    B: Object,
+{
+    query::contact(a.isometry(), a.shape(), b.isometry(), b.shape(), prediction).unwrap_or(None)
+}
+
+/// Check if two objects will collide
+#[inline]
+pub fn collides<A, B>(a: &A, b: &B, options: ShapeCastOptions) -> Option<ShapeCastHit>
+where
+    A: Object,
+    B: Object,
+{
+    query::cast_shapes(
+        &a.isometry(),
+        &a.velocity(),
+        a.shape(),
+        &b.isometry(),
+        &b.velocity(),
+        b.shape(),
+        options,
+    )
+    .unwrap_or(None)
 }

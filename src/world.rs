@@ -8,7 +8,8 @@ pub mod aabb;
 
 use crate::{
     object::{
-        kinematic_body::KinematicBody, static_body::StaticBody, trigger_area::TriggerArea, Object,
+        collides, intersects, kinematic_body::KinematicBody, static_body::StaticBody,
+        trigger_area::TriggerArea, Object,
     },
     Shared,
 };
@@ -48,7 +49,10 @@ impl World {
     }
 
     /// Update the state of the world
-    pub fn update(&mut self, delta_time: Real) {
+    pub fn update(&mut self, delta_time: Real, epsilon: Real) {
+        // Options for kinematic bodies collisions
+        let options = ShapeCastOptions::with_max_time_of_impact(delta_time);
+
         // Check collisions between kinematic bodies and static bodies
         for kinematic in self.kinematic_set.iter_mut() {
             // prepare the  kinematic body for current update
@@ -62,14 +66,13 @@ impl World {
                 .for_each_overlaps(&aabb, |astatic| {
                     // if there is a contact between the two bodies,
                     // apply the result to the kinematic body
-                    if let Some(contact) = astatic.read().collides_with(&mut_kine) {
-                        mut_kine.apply_contact(&contact);
+                    if let Some(hit) =
+                        collides::<KinematicBody, StaticBody>(&mut_kine, &astatic.read(), options)
+                    {
+                        mut_kine.add_hit(hit, None);
                     }
                 });
         }
-
-        // Options for kinematic bodies collisions
-        let options = ShapeCastOptions::with_max_time_of_impact(delta_time);
 
         // Check collisions inbetween kinematic bodies
         self.kinematic_set.repartition();
@@ -79,11 +82,19 @@ impl World {
                 // get mutable access to both bodies
                 let mut mut_k1 = kinematic1.write();
                 let mut mut_k2 = kinematic2.write();
-                if let Some(collision) = mut_k1.collides_with(&mut_k2, options) {
-                    mut_k1.apply_collision(&collision);
-                    mut_k2.apply_collision(&collision.swapped());
+
+                if let Some(hit) =
+                    collides::<KinematicBody, KinematicBody>(&mut_k1, &mut_k2, options)
+                {
+                    mut_k1.add_hit(hit, Some(mut_k2.weight()));
+                    mut_k2.add_hit(hit.swapped(), Some(mut_k1.weight()));
                 }
             });
+
+        // resolve actual motion using accumulated collision hits
+        for kinematic in self.kinematic_set.iter_mut() {
+            kinematic.write().apply_hits(delta_time, epsilon);
+        }
 
         // Check intersections between kinematic bodies and trigger areas
         for kinematic in self.kinematic_set.iter_mut() {
@@ -96,7 +107,7 @@ impl World {
                 .for_each_overlaps(&aabb, |atrigger| {
                     // if there is an intersection between the two areas,
                     // apply the result to the kinematic body
-                    if atrigger.read().intersects_with(&mut_kine) {
+                    if intersects::<KinematicBody, TriggerArea>(&mut_kine, &atrigger.read()) {
                         // TODO
                     }
                 });

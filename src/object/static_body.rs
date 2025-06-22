@@ -1,13 +1,12 @@
 //! Fixed body which does not report collisions
 
-use super::{kinematic_body::KinematicBody, CommonData, Mask, Object, MASK_ALL};
+use super::{CommonData, Mask, Object, MASK_ALL};
 use crate::world::aabb::Aabb;
 use alloc::sync::Arc;
 use bvh_arena::VolumeHandle;
 use delegate::delegate;
 use parry::{
     math::{Isometry, Real},
-    query::{contact, Contact},
     shape::Shape,
 };
 
@@ -55,20 +54,5 @@ impl Object for StaticBody {
     #[inline]
     fn layer(&self) -> Mask {
         self.layer
-    }
-}
-
-impl StaticBody {
-    /// Detect a collision between this fixed body and a kinematic body
-    pub fn collides_with(&self, kinematic: &KinematicBody) -> Option<Contact> {
-        // Check if the fixed body and the kinematic body are colliding
-        contact(
-            kinematic.next_isometry(),
-            kinematic.shape(),
-            &self.isometry(),
-            self.shape(),
-            0.0,
-        )
-        .unwrap_or(None)
     }
 }

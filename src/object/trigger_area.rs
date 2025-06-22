@@ -1,13 +1,12 @@
 //! Trigger zone which detect intersection with kinematic bodies
 
-use super::{kinematic_body::KinematicBody, CommonData, Mask, Object, MASK_ALL};
+use super::{CommonData, Mask, Object, MASK_ALL};
 use crate::world::aabb::Aabb;
 use alloc::sync::Arc;
 use bvh_arena::VolumeHandle;
 use delegate::delegate;
 use parry::{
     math::{Isometry, Real},
-    query::intersection_test,
     shape::Shape,
 };
 
@@ -55,18 +54,5 @@ impl Object for TriggerArea {
     #[inline]
     fn mask(&self) -> Mask {
         self.mask
-    }
-}
-
-impl TriggerArea {
-    /// Check if this trigger intersects with the given kinematic body
-    pub fn intersects_with(&self, kinematic: &KinematicBody) -> bool {
-        intersection_test(
-            kinematic.isometry(),
-            kinematic.shape(),
-            &self.isometry(),
-            self.shape(),
-        )
-        .unwrap_or(false)
     }
 }
