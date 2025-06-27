@@ -27,29 +27,39 @@ pub struct World {
 
     /// Store the list of trigger areas
     trigger_set: Set<TriggerArea>,
+
+    /// Epsilon value
+    epsilon: Real,
 }
 
 impl World {
     /// Create a new world
-    pub fn new() -> Self {
+    pub fn new(epsilon: Real) -> Self {
         Self {
             kinematic_set: Set::default(),
             static_set: Set::default(),
             trigger_set: Set::default(),
+            epsilon,
         }
     }
 
     /// Create a new empty world with a predefined capacity
-    pub fn with_capacity(cap_kinematic: usize, cap_static: usize, cap_trigger: usize) -> Self {
+    pub fn with_capacity(
+        epsilon: Real,
+        cap_kinematic: usize,
+        cap_static: usize,
+        cap_trigger: usize,
+    ) -> Self {
         Self {
             kinematic_set: Set::with_capacity(cap_kinematic),
             static_set: Set::with_capacity(cap_static),
             trigger_set: Set::with_capacity(cap_trigger),
+            epsilon,
         }
     }
 
     /// Update the state of the world
-    pub fn update(&mut self, delta_time: Real, epsilon: Real) {
+    pub fn update(&mut self, delta_time: Real) {
         // Options for kinematic bodies collisions
         let options = ShapeCastOptions::with_max_time_of_impact(delta_time);
 
@@ -93,7 +103,7 @@ impl World {
 
         // resolve actual motion using accumulated collision hits
         for kinematic in self.kinematic_set.iter_mut() {
-            kinematic.write().apply_hits(delta_time, epsilon);
+            kinematic.write().apply_hits(delta_time, self.epsilon);
         }
 
         // Check intersections between kinematic bodies and trigger areas

@@ -18,6 +18,9 @@ pub mod object;
 /// Define the world
 pub mod world;
 
+/// Helper functions
+pub(crate) mod util;
+
 /// Use alloc crate for no_std support
 extern crate alloc;
 

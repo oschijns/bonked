@@ -12,8 +12,6 @@ use std::sync::Arc;
 
 #[macroquad::main("3D")]
 async fn main() {
-    const EPSILON: Real = 0.0001;
-
     let camera_speed = 30.0f32.to_radians();
     let mut cam_ang = 0.0f32;
 
@@ -51,26 +49,31 @@ async fn main() {
             draw_cylinder_wires(pos, cap.radius, cap.radius, cap.height(), None, RED);
         }
 
-        world.update(delta, EPSILON);
+        world.update(delta);
 
         next_frame().await
     }
 }
 
 fn build_world() -> World {
-    let mut world = World::with_capacity(1, 1, 0);
+    const EPSILON: Real = 0.0001;
+    let mut world = World::with_capacity(EPSILON, 1, 1, 0);
     world.add_static(make_shared(StaticBody::new(
         new_box(20.0, 1.0, 20.0),
-        Isometry::new(Vector::new(0.0, 0.0, 0.0), Vector::zeros()),
+        Isometry::new(Vector::new(0.0, -0.5, 0.0), Vector::zeros()),
         u32::MAX,
     )));
-    world.add_kinematic(make_shared(KinematicBody::new(
+
+    let mut kine = KinematicBody::new(
         new_capsule(1.0, 2.0),
-        Isometry::new(Vector::new(0.0, 1.0, 0.0), Vector::zeros()),
+        Isometry::new(Vector::new(0.0, 10.0, 0.0), Vector::zeros()),
         1.0,
         1,
         u32::MAX,
-    )));
+    );
+    kine.velocity.y = -1.0;
+    world.add_kinematic(make_shared(kine));
+
     world
 }
 

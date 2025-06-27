@@ -1,11 +1,12 @@
 //! Kinematic body which reports collisions
 
 use super::{CommonData, Mask, Object};
-use crate::world::aabb::Aabb;
+use crate::{util::project_onto, world::aabb::Aabb};
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use bvh_arena::VolumeHandle;
 use core::cmp::Ordering;
 use delegate::delegate;
+use nalgebra_glm::is_null;
 use parry::{
     math::{Isometry, Real, Translation, Vector},
     query::ShapeCastHit,
@@ -27,7 +28,7 @@ pub struct KinematicBody {
     weight: Real,
 
     /// Velocity of the object
-    velocity: Vector<Real>,
+    pub velocity: Vector<Real>,
 
     // TODO: look at rapier's "EffectiveCharacterMovement" for inspiration
     /// Target isometry at the next tick
@@ -101,6 +102,12 @@ impl Object for KinematicBody {
     fn mask(&self) -> Mask {
         self.mask
     }
+
+    /// Get the velocity of the body (if it has one)
+    #[inline]
+    fn velocity(&self) -> Vector<Real> {
+        self.velocity
+    }
 }
 
 impl KinematicBody {
@@ -155,14 +162,17 @@ impl KinematicBody {
         for hit in self.hits.iter() {
             let delta = hit.hit.time_of_impact * (1.0 - hit.weight_ratio);
             offset -= hit.hit.normal1.into_inner() * delta;
+
+            // pushing against a solid object
+            self.velocity = project_onto(&self.velocity, &hit.hit.normal1);
         }
 
-        // apply the push back to the position of the object
-        let translation = Translation::from(offset * delta_time);
-        self.next_isometry.append_translation_mut(&translation);
-
-        // apply the push back to the velocity
-        self.velocity -= offset;
+        // check if the push back is relevant
+        if !is_null(&offset, epsilon) {
+            // apply the push back to the position of the object
+            let translation = Translation::from(offset * delta_time);
+            self.next_isometry.append_translation_mut(&translation);
+        }
     }
 }
 

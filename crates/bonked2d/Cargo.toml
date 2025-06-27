@@ -18,7 +18,13 @@ mask-u32 = []
 mask-u64 = []
 
 # enable support for the standard library
-std = ["parry2d?/std", "parry2d-f64?/std", "bvh-arena/std", "spin/std"]
+std = [
+    "parry2d?/std",
+    "parry2d-f64?/std",
+    "nalgebra-glm/std",
+    "bvh-arena/std",
+    "spin/std",
+]
 
 # enable support for alloc
 alloc = ["parry2d?/alloc", "parry2d-f64?/alloc"]
@@ -61,6 +67,9 @@ parry2d-f64 = { version = "0.19", features = [
     "required-features",
     "alloc",
 ], default-features = false, optional = true }
+
+# Geometry operations
+nalgebra-glm = { version = "0.19", default-features = false }
 
 # Delegate methods from internal fields
 delegate = "0.13"
