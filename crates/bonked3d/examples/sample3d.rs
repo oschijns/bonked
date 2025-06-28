@@ -6,16 +6,17 @@ use bonked3d::{
 use macroquad::prelude::*;
 use parry3d::{
     math::{Isometry, Point, Real, Vector},
-    shape::{Capsule, Cuboid, Shape},
+    shape::{Ball, Capsule, Cuboid, Cylinder, Shape},
 };
-use std::sync::Arc;
+use spin::RwLock;
+use std::{sync::Arc, u32};
 
 #[macroquad::main("3D")]
 async fn main() {
     let camera_speed = 30.0f32.to_radians();
     let mut cam_ang = 0.0f32;
 
-    let mut world = build_world();
+    let (mut world, bodies) = build_world();
 
     loop {
         let delta = get_frame_time();
@@ -35,46 +36,83 @@ async fn main() {
         });
 
         draw_grid(20, 1., BLACK, GRAY);
-        for astatic in world.statics().iter() {
-            let s = astatic.read();
-            let pos = to_vec3(s.isometry().translation.vector);
-            let size = to_vec3(s.shape().as_cuboid().unwrap().half_extents) * 2.0;
-            draw_cube_wires(pos, size, BLUE);
-        }
 
-        for kinematic in world.kinematics().iter() {
-            let k = kinematic.read();
-            let pos = to_vec3(k.isometry().translation.vector);
-            let cap = k.shape().as_capsule().unwrap();
-            draw_cylinder_wires(pos, cap.radius, cap.radius, cap.height(), None, RED);
+        for body in bodies.iter() {
+            let b = body.ptr.read();
+            let shape = b.shape();
+            let pos = to_glam(b.isometry().translation.vector);
+
+            match body.shape_type {
+                ShapeType::Box => {
+                    let shape = shape.as_cuboid().unwrap();
+                    let size = to_glam(shape.half_extents) * 2.0;
+                    draw_cube_wires(pos, size, body.color);
+                }
+                ShapeType::Sphere => {
+                    let shape = shape.as_ball().unwrap();
+                    draw_sphere_wires(pos, shape.radius, None, body.color);
+                }
+                ShapeType::Cylinder => {
+                    let shape = shape.as_cylinder().unwrap();
+                    draw_cylinder_wires(
+                        pos,
+                        shape.radius,
+                        shape.radius,
+                        shape.half_height * 2.0,
+                        None,
+                        body.color,
+                    );
+                }
+                ShapeType::Capsule => {
+                    let shape = shape.as_capsule().unwrap();
+                    draw_cylinder_wires(
+                        pos,
+                        shape.radius,
+                        shape.radius,
+                        shape.height(),
+                        None,
+                        body.color,
+                    );
+                }
+            }
         }
 
         world.update(delta);
+
+        // quit the example
+        if is_quit_requested() || is_key_down(KeyCode::Escape) {
+            break;
+        }
 
         next_frame().await
     }
 }
 
-fn build_world() -> World {
+fn build_world() -> (World, Vec<Body>) {
     const EPSILON: Real = 0.0001;
     let mut world = World::with_capacity(EPSILON, 1, 1, 0);
-    world.add_static(make_shared(StaticBody::new(
-        new_box(20.0, 1.0, 20.0),
-        Isometry::new(Vector::new(0.0, -0.5, 0.0), Vector::zeros()),
-        u32::MAX,
-    )));
 
-    let mut kine = KinematicBody::new(
-        new_capsule(1.0, 2.0),
-        Isometry::new(Vector::new(0.0, 10.0, 0.0), Vector::zeros()),
-        1.0,
-        1,
-        u32::MAX,
-    );
-    kine.velocity.y = -1.0;
-    world.add_kinematic(make_shared(kine));
+    let bodies = vec![
+        Body::new_box([0.0, -0.5, 0.0], BLUE, None, [20.0, 1.0, 20.0]),
+        {
+            let mut body = Body::new_capsule([0.0, 10.0, 0.0], RED, Some(1.0), 1.0, 2.0);
+            body.set_velocity(&to_nalgebra([0.0, -1.0, 0.0]));
+            body
+        },
+        {
+            let mut body = Body::new_capsule([0.5, 15.0, 0.0], RED, Some(1.0), 1.0, 2.0);
+            body.set_velocity(&to_nalgebra([0.0, -1.0, 0.0]));
+            body
+        },
+    ];
 
-    world
+    for body in bodies.iter() {
+        match body.body_type.clone() {
+            BodyType::Static(body) => world.add_static(body),
+            BodyType::Kinematic(body) => world.add_kinematic(body),
+        }
+    }
+    (world, bodies)
 }
 
 struct Inputs {
@@ -118,21 +156,116 @@ impl Inputs {
     }
 }
 
-fn new_box(x: f32, y: f32, z: f32) -> Arc<dyn Shape> {
-    let size = Vector::new(x, y, z) * 0.5;
-    Arc::new(Cuboid::new(size))
+/// A physics body that can be rendered with a color
+struct Body {
+    body_type: BodyType,
+    ptr: Arc<RwLock<dyn Object>>,
+    shape_type: ShapeType,
+    color: Color,
 }
 
-fn new_capsule(diameter: f32, height: f32) -> Arc<dyn Shape> {
-    let radius = diameter * 0.5;
-    let half = (height * 0.5 - radius).max(0.0);
-    let a = Point::new(0.0, half, 0.0);
-    let b = Point::new(0.0, -half * 0.5, 0.0);
-    Arc::new(Capsule::new(a, b, radius))
+#[derive(Clone)]
+enum BodyType {
+    Static(Arc<RwLock<StaticBody>>),
+    Kinematic(Arc<RwLock<KinematicBody>>),
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+enum ShapeType {
+    Box,
+    Sphere,
+    Capsule,
+    Cylinder,
+}
+
+type V3 = [f32; 3];
+
+impl Body {
+    fn new_box(pos: V3, color: Color, weight: Option<f32>, size: V3) -> Self {
+        let shape = Arc::new(Cuboid::new(to_nalgebra(size) * 0.5));
+        let (body_type, ptr) = make_body(pos, weight, shape);
+        Self {
+            body_type,
+            ptr,
+            shape_type: ShapeType::Box,
+            color,
+        }
+    }
+
+    fn new_sphere(pos: V3, color: Color, weight: Option<f32>, diameter: f32) -> Self {
+        let shape = Arc::new(Ball::new(diameter * 0.5));
+        let (body_type, ptr) = make_body(pos, weight, shape);
+        Self {
+            body_type,
+            ptr,
+            shape_type: ShapeType::Sphere,
+            color,
+        }
+    }
+
+    fn new_capsule(pos: V3, color: Color, weight: Option<f32>, diameter: f32, height: f32) -> Self {
+        let radius = diameter * 0.5;
+        let half = (height * 0.5 - radius).max(0.0);
+        let a = Point::new(0.0, half, 0.0);
+        let b = Point::new(0.0, -half * 0.5, 0.0);
+        let shape = Arc::new(Capsule::new(a, b, radius));
+        let (body_type, ptr) = make_body(pos, weight, shape);
+        Self {
+            body_type,
+            ptr,
+            shape_type: ShapeType::Capsule,
+            color,
+        }
+    }
+
+    fn new_cylinder(
+        pos: V3,
+        color: Color,
+        weight: Option<f32>,
+        diameter: f32,
+        height: f32,
+    ) -> Self {
+        let shape = Arc::new(Cylinder::new(height * 0.5, diameter * 0.5));
+        let (body_type, ptr) = make_body(pos, weight, shape);
+        Self {
+            body_type,
+            ptr,
+            shape_type: ShapeType::Cylinder,
+            color,
+        }
+    }
+
+    fn set_velocity(&mut self, vel: &Vector<Real>) {
+        if let BodyType::Kinematic(body) = &mut self.body_type {
+            body.write().velocity = *vel;
+        }
+    }
+}
+
+fn make_body(
+    pos: V3,
+    weight: Option<f32>,
+    shape: Arc<dyn Shape>,
+) -> (BodyType, Arc<RwLock<dyn Object>>) {
+    let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
+    if let Some(weight) = weight {
+        let ptr = make_shared(KinematicBody::new(shape, pos, weight, u32::MAX, u32::MAX));
+        (BodyType::Kinematic(ptr.clone()), ptr)
+    } else {
+        let ptr = make_shared(StaticBody::new(shape, pos, u32::MAX));
+        (BodyType::Static(ptr.clone()), ptr)
+    }
 }
 
 /// Converts a `Vector<f32>` to a `Vec3`.
 #[inline]
-fn to_vec3(v: Vector<f32>) -> Vec3 {
+fn to_glam(v: Vector<f32>) -> Vec3 {
     Vec3::new(v.x, v.y, v.z)
+}
+
+/// Converts a `[f32; 3]` to a `Vector<f32>`.
+#[inline]
+fn to_nalgebra(v: V3) -> Vector<f32> {
+    Vector::new(v[0], v[1], v[2])
 }

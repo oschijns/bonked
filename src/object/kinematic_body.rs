@@ -1,7 +1,7 @@
 //! Kinematic body which reports collisions
 
 use super::{CommonData, Mask, Object};
-use crate::{util::project_onto, world::aabb::Aabb};
+use crate::world::aabb::Aabb;
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use bvh_arena::VolumeHandle;
 use core::cmp::Ordering;
@@ -143,9 +143,10 @@ impl KinematicBody {
         // Compare the weight of the two object to deduce
         // which one should push back the other more.
         let weight_ratio = if let Some(w) = other_weight {
-            self.weight / (self.weight + w)
+            1.0 - (self.weight / (self.weight + w))
         } else {
-            0.0
+            // the other object is a static body
+            1.0
         };
 
         // add the hit result to the set
@@ -155,16 +156,21 @@ impl KinematicBody {
     /// Apply the hits to the body
     pub fn apply_hits(&mut self, delta_time: Real, epsilon: Real) {
         // order the hits from closest to furthest
-        self.hits.sort_by(|a, b| a.order(b, epsilon));
+        //self.hits.sort_by(|a, b| a.order(b, epsilon));
 
         // Compute how much we must push back the object
         let mut offset = Vector::<Real>::zeros();
         for hit in self.hits.iter() {
-            let delta = hit.hit.time_of_impact * (1.0 - hit.weight_ratio);
-            offset -= hit.hit.normal1.into_inner() * delta;
+            // push back the object according to its mass
+            let normal = hit.hit.normal1.into_inner();
+            let ratio = hit.weight_ratio;
 
-            // pushing against a solid object
-            self.velocity = project_onto(&self.velocity, &hit.hit.normal1);
+            // push back the object
+            offset -= normal * (hit.hit.time_of_impact * ratio);
+
+            // cut off form the velocity
+            let ortho = normal.dot(&self.velocity);
+            self.velocity -= normal * (ortho * ratio);
         }
 
         // check if the push back is relevant
