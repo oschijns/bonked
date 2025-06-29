@@ -23,7 +23,7 @@ use parry::{
 const MASK_ALL: Mask = Mask::MAX;
 
 /// Trait implemented for static and dynamic bodies
-pub trait Object {
+pub trait Object<P = ()> {
     /// Store the handle of this object after it has been added to the world
     fn set_handle(&mut self, handle: VolumeHandle);
 
@@ -41,6 +41,12 @@ pub trait Object {
 
     /// Create an Axis-Aligned Bounding Box for this body
     fn aabb(&self) -> Aabb;
+
+    /// Access the payload defined on this object
+    fn payload(&self) -> &P;
+
+    /// Mutable access to the payload defined on this object
+    fn payload_mut(&mut self) -> &mut P;
 
     /// Get the layer(s) this body belongs to
     #[inline]
@@ -62,7 +68,7 @@ pub trait Object {
 }
 
 /// Common data shared between static and dynamic bodies
-struct CommonData {
+struct CommonData<P = ()> {
     /// Handle of this body in the world
     handle: Option<VolumeHandle>,
 
@@ -71,21 +77,27 @@ struct CommonData {
 
     /// Isometry of this body
     isometry: Isometry<Real>,
+
+    /// Arbitrary payload.
+    /// For example can be used to store a pointer to the
+    /// actual game object associated with this physics object.
+    payload: P,
 }
 
-impl CommonData {
+impl<P> CommonData<P> {
     /// Create a new common data instance
     #[inline]
-    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>) -> Self {
+    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, payload: P) -> Self {
         CommonData {
             handle: None,
             shape,
             isometry,
+            payload,
         }
     }
 }
 
-impl Object for CommonData {
+impl<P> Object<P> for CommonData<P> {
     /// Store the handle of this object after it has been added to the world
     #[inline]
     fn set_handle(&mut self, handle: VolumeHandle) {
@@ -121,40 +133,52 @@ impl Object for CommonData {
     fn aabb(&self) -> Aabb {
         Aabb::new(self.shape.compute_aabb(&self.isometry), MASK_ALL, MASK_ALL)
     }
+
+    /// Access the payload defined on this object
+    #[inline]
+    fn payload(&self) -> &P {
+        &self.payload
+    }
+
+    /// Mutable access to the payload defined on this object
+    #[inline]
+    fn payload_mut(&mut self) -> &mut P {
+        &mut self.payload
+    }
 }
 
 /// Check if two objects intersects
 #[inline]
-pub fn intersects<A, B>(a: &A, b: &B) -> bool
+pub fn intersects<A, PA, B, PB>(a: &A, b: &B) -> bool
 where
-    A: Object,
-    B: Object,
+    A: Object<PA>,
+    B: Object<PB>,
 {
     query::intersection_test(a.isometry(), a.shape(), b.isometry(), b.shape()).unwrap_or(false)
 }
 
 /// Check if two objects are in contact
 #[inline]
-pub fn contacts<A, B>(a: &A, b: &B, prediction: Real) -> Option<Contact>
+pub fn contacts<A, PA, B, PB>(a: &A, b: &B, prediction: Real) -> Option<Contact>
 where
-    A: Object,
-    B: Object,
+    A: Object<PA>,
+    B: Object<PB>,
 {
     query::contact(a.isometry(), a.shape(), b.isometry(), b.shape(), prediction).unwrap_or(None)
 }
 
 /// Check if two objects will collide
 #[inline]
-pub fn collides<A, B>(a: &A, b: &B, options: ShapeCastOptions) -> Option<ShapeCastHit>
+pub fn collides<A, PA, B, PB>(a: &A, b: &B, options: ShapeCastOptions) -> Option<ShapeCastHit>
 where
-    A: Object,
-    B: Object,
+    A: Object<PA>,
+    B: Object<PB>,
 {
     query::cast_shapes(
-        &a.isometry(),
+        a.isometry(),
         &a.velocity(),
         a.shape(),
-        &b.isometry(),
+        b.isometry(),
         &b.velocity(),
         b.shape(),
         options,

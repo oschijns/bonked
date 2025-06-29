@@ -18,13 +18,12 @@ pub struct Set<O> {
     pub(crate) partition: Bvh<Shared<O>, Aabb>,
 }
 
-/// Create a new empty set
+/// Generate a default set for this collection
 impl<O> Default for Set<O> {
-    #[inline]
     fn default() -> Self {
         Self {
-            objects: Vec::default(),
-            partition: Bvh::default(),
+            objects: Default::default(),
+            partition: Default::default(),
         }
     }
 }
@@ -63,7 +62,7 @@ impl<O> Set<O> {
     pub fn quick_remove(&mut self, object: &Shared<O>) -> bool {
         // find the position of the object in the list
         for (index, value) in self.objects.iter().enumerate() {
-            if Arc::ptr_eq(&object, value) {
+            if Arc::ptr_eq(object, value) {
                 // We found the index, create an handle and remove the object.
                 self.objects.swap_remove(index);
 
@@ -82,12 +81,12 @@ impl<O> Set<O> {
     }
 }
 
-impl<O> Set<O>
-where
-    O: Object,
-{
+impl<O> Set<O> {
     /// Store the element and add it to the partition too
-    pub fn add(&mut self, object: Shared<O>) {
+    pub fn add<P>(&mut self, object: Shared<O>)
+    where
+        O: Object<P>,
+    {
         // add the object to the list
         self.objects.push(object.clone());
 
@@ -98,10 +97,13 @@ where
     }
 
     /// Remove an element from this set
-    pub fn clean_remove(&mut self, object: &Shared<O>) -> bool {
+    pub fn clean_remove<P>(&mut self, object: &Shared<O>) -> bool
+    where
+        O: Object<P>,
+    {
         // find the position of the object in the list
         for (index, value) in self.objects.iter().enumerate() {
-            if Arc::ptr_eq(&object, value) {
+            if Arc::ptr_eq(object, value) {
                 // We found the index, create an handle and remove the object.
                 self.objects.swap_remove(index);
 
@@ -123,7 +125,10 @@ where
     }
 
     /// Compute a partitionning for the objects defined in this set
-    pub fn repartition(&mut self) {
+    pub fn repartition<P>(&mut self)
+    where
+        O: Object<P>,
+    {
         self.partition.clear();
         for object in &self.objects {
             let mut mut_obj = object.write();

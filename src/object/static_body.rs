@@ -11,26 +11,26 @@ use parry::{
 };
 
 /// A fixed body in the world
-pub struct StaticBody {
+pub struct StaticBody<P = ()> {
     /// Shape, isometry and handle
-    common: CommonData,
+    common: CommonData<P>,
 
     /// Specify the layer this body belongs to
     layer: Mask,
 }
 
-impl StaticBody {
+impl<P> StaticBody<P> {
     /// Build a new static body
     #[inline]
-    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, layer: Mask) -> Self {
+    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, payload: P, layer: Mask) -> Self {
         Self {
-            common: CommonData::new(shape, isometry),
+            common: CommonData::new(shape, isometry, payload),
             layer,
         }
     }
 }
 
-impl Object for StaticBody {
+impl<P> Object<P> for StaticBody<P> {
     delegate! {
         to self.common {
             fn set_handle(&mut self, handle: VolumeHandle);
@@ -38,6 +38,8 @@ impl Object for StaticBody {
             fn handle(&self) -> Option<VolumeHandle>;
             fn shape(&self) -> &dyn Shape;
             fn isometry(&self) -> &Isometry<f32>;
+            fn payload(&self) -> &P;
+            fn payload_mut(&mut self) -> &mut P;
         }
     }
 

@@ -14,9 +14,9 @@ use parry::{
 };
 
 /// A kinematic body in the world
-pub struct KinematicBody {
+pub struct KinematicBody<P = ()> {
     /// Shape, isometry and handle
-    common: CommonData,
+    common: CommonData<P>,
 
     /// Collision layer of the body
     layer: Mask,
@@ -27,14 +27,16 @@ pub struct KinematicBody {
     /// Weight of this object, define how two objects can push against each other
     weight: Real,
 
-    /// Velocity of the object
+    /// Velocity of the object.
+    /// It can be accessed directly to modify each coordinate individually.
     pub velocity: Vector<Real>,
 
-    // TODO: look at rapier's "EffectiveCharacterMovement" for inspiration
     /// Target isometry at the next tick
     next_isometry: Isometry<Real>,
 
     /// Store collision results
+    /// Hit results are stored in boxes so that reordoring the vector can be quicker
+    #[allow(clippy::vec_box)]
     hits: Vec<Box<HitResult>>,
 }
 
@@ -47,17 +49,18 @@ pub struct HitResult {
     weight_ratio: Real,
 }
 
-impl KinematicBody {
+impl<P> KinematicBody<P> {
     /// Create a new kinematic body
     pub fn new(
         shape: Arc<dyn Shape>,
         isometry: Isometry<Real>,
-        weight: Real,
+        payload: P,
         layer: Mask,
         mask: Mask,
+        weight: Real,
     ) -> Self {
         Self {
-            common: CommonData::new(shape, isometry),
+            common: CommonData::new(shape, isometry, payload),
             layer,
             mask,
             weight,
@@ -68,7 +71,7 @@ impl KinematicBody {
     }
 }
 
-impl Object for KinematicBody {
+impl<P> Object<P> for KinematicBody<P> {
     delegate! {
         to self.common {
             fn set_handle(&mut self, handle: VolumeHandle);
@@ -76,6 +79,8 @@ impl Object for KinematicBody {
             fn handle(&self) -> Option<VolumeHandle>;
             fn shape(&self) -> &dyn Shape;
             fn isometry(&self) -> &Isometry<f32>;
+            fn payload(&self) -> &P;
+            fn payload_mut(&mut self) -> &mut P;
         }
     }
 
@@ -110,7 +115,7 @@ impl Object for KinematicBody {
     }
 }
 
-impl KinematicBody {
+impl<P> KinematicBody<P> {
     /// Compute the estimated next isometry by applying the velocity
     pub fn pre_update(&mut self, delta_time: Real) {
         // submit the computed new isometry

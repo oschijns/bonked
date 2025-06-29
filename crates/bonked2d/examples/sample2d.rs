@@ -1,6 +1,8 @@
 use bonked2d::{
     make_shared,
-    object::{kinematic_body::KinematicBody, static_body::StaticBody, Object},
+    object::{
+        kinematic_body::KinematicBody, static_body::StaticBody, trigger_area::TriggerArea, Object,
+    },
     world::World,
 };
 use macroquad::{miniquad::window, prelude::*};
@@ -13,7 +15,7 @@ use std::{sync::Arc, u32};
 
 #[macroquad::main("2D")]
 async fn main() {
-    const THICKNESS: f32 = 0.02;
+    const THICKNESS: f32 = 0.05;
     const ZOOM: f32 = 0.1;
 
     let (mut world, bodies) = build_world();
@@ -77,23 +79,33 @@ fn build_world() -> (World, Vec<Body>) {
     let mut world = World::with_capacity(EPSILON, 1, 1, 0);
 
     let bodies = vec![
-        Body::new_box([0.0, -0.5], BLUE, None, [20.0, 1.0]),
+        Body::new_box([0.0, -0.5], BLUE, BodyData::Static, [20.0, 1.0]),
         {
-            let mut body = Body::new_capsule([0.0, 10.0], RED, Some(1.0), 1.0, 2.0);
+            let mut body = Body::new_capsule([0.0, 10.0], RED, BodyData::Kinematic(1.0), 1.0, 2.0);
             body.set_velocity(&to_nalgebra([0.0, -1.0]));
             body
         },
         {
-            let mut body = Body::new_capsule([0.5, 15.0], ORANGE, Some(1.0), 1.0, 2.0);
-            body.set_velocity(&to_nalgebra([0.0, -1.1]));
+            let mut body =
+                Body::new_capsule([0.5, 15.0], ORANGE, BodyData::Kinematic(1.0), 1.0, 2.0);
+            body.set_velocity(&to_nalgebra([0.0, -1.5]));
             body
         },
+        Body::new_box(
+            [5.0, 2.5],
+            MAGENTA,
+            BodyData::Trigger(|_, _| {
+                println!("Object hit trigger !");
+            }),
+            [5.0, 5.0],
+        ),
     ];
 
     for body in bodies.iter() {
         match body.body_type.clone() {
             BodyType::Static(body) => world.add_static(body),
             BodyType::Kinematic(body) => world.add_kinematic(body),
+            BodyType::Trigger(trigger) => world.add_trigger(trigger),
         }
     }
     (world, bodies)
@@ -107,7 +119,6 @@ struct Inputs {
 impl Inputs {
     fn read() -> Self {
         let mut motion = IVec2::ZERO;
-        let mut camera = 0;
 
         // motion
         if is_key_down(KeyCode::Left) {
@@ -142,6 +153,7 @@ struct Body {
 enum BodyType {
     Static(Arc<RwLock<StaticBody>>),
     Kinematic(Arc<RwLock<KinematicBody>>),
+    Trigger(Arc<RwLock<TriggerArea>>),
 }
 
 #[repr(C)]
@@ -152,12 +164,18 @@ enum ShapeType {
     Capsule,
 }
 
+enum BodyData {
+    Static,
+    Kinematic(f32),
+    Trigger(fn(&mut (), &mut KinematicBody)),
+}
+
 type V2 = [f32; 2];
 
 impl Body {
-    fn new_box(pos: V2, color: Color, weight: Option<f32>, size: V2) -> Self {
+    fn new_box(pos: V2, color: Color, data: BodyData, size: V2) -> Self {
         let shape = Arc::new(Cuboid::new(to_nalgebra(size) * 0.5));
-        let (body_type, ptr) = make_body(pos, weight, shape);
+        let (body_type, ptr) = make_body(pos, data, shape);
         Self {
             body_type,
             ptr,
@@ -166,9 +184,9 @@ impl Body {
         }
     }
 
-    fn new_ball(pos: V2, color: Color, weight: Option<f32>, diameter: f32) -> Self {
+    fn new_ball(pos: V2, color: Color, data: BodyData, diameter: f32) -> Self {
         let shape = Arc::new(Ball::new(diameter * 0.5));
-        let (body_type, ptr) = make_body(pos, weight, shape);
+        let (body_type, ptr) = make_body(pos, data, shape);
         Self {
             body_type,
             ptr,
@@ -177,13 +195,13 @@ impl Body {
         }
     }
 
-    fn new_capsule(pos: V2, color: Color, weight: Option<f32>, diameter: f32, height: f32) -> Self {
+    fn new_capsule(pos: V2, color: Color, data: BodyData, diameter: f32, height: f32) -> Self {
         let radius = diameter * 0.5;
         let half = (height * 0.5 - radius).max(0.0);
         let a = Point::new(0.0, half);
         let b = Point::new(0.0, -half * 0.5);
         let shape = Arc::new(Capsule::new(a, b, radius));
-        let (body_type, ptr) = make_body(pos, weight, shape);
+        let (body_type, ptr) = make_body(pos, data, shape);
         Self {
             body_type,
             ptr,
@@ -201,16 +219,30 @@ impl Body {
 
 fn make_body(
     pos: V2,
-    weight: Option<f32>,
+    data: BodyData,
     shape: Arc<dyn Shape>,
 ) -> (BodyType, Arc<RwLock<dyn Object>>) {
     let pos = Isometry::new(to_nalgebra(pos), 0.0);
-    if let Some(weight) = weight {
-        let ptr = make_shared(KinematicBody::new(shape, pos, weight, u32::MAX, u32::MAX));
-        (BodyType::Kinematic(ptr.clone()), ptr)
-    } else {
-        let ptr = make_shared(StaticBody::new(shape, pos, u32::MAX));
-        (BodyType::Static(ptr.clone()), ptr)
+    match data {
+        BodyData::Static => {
+            let ptr = make_shared(StaticBody::new(shape, pos, (), u32::MAX));
+            (BodyType::Static(ptr.clone()), ptr)
+        }
+        BodyData::Kinematic(weight) => {
+            let ptr = make_shared(KinematicBody::new(
+                shape,
+                pos,
+                (),
+                u32::MAX,
+                u32::MAX,
+                weight,
+            ));
+            (BodyType::Kinematic(ptr.clone()), ptr)
+        }
+        BodyData::Trigger(callback) => {
+            let ptr = make_shared(TriggerArea::new(shape, pos, (), u32::MAX, callback));
+            (BodyType::Trigger(ptr.clone()), ptr)
+        }
     }
 }
 

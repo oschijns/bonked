@@ -1,7 +1,11 @@
 //! Axis-Aligned Bounding Box (AABB)
 
 use crate::Mask;
-use parry::bounding_volume as p;
+use parry::{
+    bounding_volume as p,
+    math::{Point, Real},
+    query::Ray,
+};
 
 /// Axis-Aligned Bounding Box (AABB)
 #[derive(Debug, Clone, Copy)]
@@ -17,10 +21,17 @@ pub struct Aabb {
 }
 
 impl Aabb {
-    /// Create a new Aabb with the given parameters
+    /// Create a new AABB with the given parameters
     #[inline]
     pub fn new(aabb: p::Aabb, layer: Mask, mask: Mask) -> Self {
         Self { aabb, layer, mask }
+    }
+
+    /// Create a new AABB from a ray
+    pub fn from_ray(ray: &Ray, max_time_of_impact: Real, mask: Mask) -> Self {
+        let (mins, maxs) = ray.origin.coords.inf_sup(&(ray.dir * max_time_of_impact));
+        let aabb = p::Aabb::new(Point::from(mins), Point::from(maxs));
+        Self::new(aabb, Mask::MAX, mask)
     }
 
     /// Access the Parry's Axis-Aligned Bounding Box
