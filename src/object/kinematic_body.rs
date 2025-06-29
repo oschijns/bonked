@@ -156,7 +156,7 @@ impl KinematicBody {
     /// Apply the hits to the body
     pub fn apply_hits(&mut self, delta_time: Real, epsilon: Real) {
         // order the hits from closest to furthest
-        //self.hits.sort_by(|a, b| a.order(b, epsilon));
+        self.hits.sort_by(|a, b| a.order(b, epsilon));
 
         // Compute how much we must push back the object
         let mut offset = Vector::<Real>::zeros();
@@ -169,8 +169,7 @@ impl KinematicBody {
             offset -= normal * (hit.hit.time_of_impact * ratio);
 
             // cut off form the velocity
-            let ortho = normal.dot(&self.velocity);
-            self.velocity -= normal * (ortho * ratio);
+            self.velocity -= normal * (normal.dot(&self.velocity) * ratio);
         }
 
         // check if the push back is relevant

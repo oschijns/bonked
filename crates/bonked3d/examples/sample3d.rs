@@ -48,7 +48,7 @@ async fn main() {
                     let size = to_glam(shape.half_extents) * 2.0;
                     draw_cube_wires(pos, size, body.color);
                 }
-                ShapeType::Sphere => {
+                ShapeType::Ball => {
                     let shape = shape.as_ball().unwrap();
                     draw_sphere_wires(pos, shape.radius, None, body.color);
                 }
@@ -65,11 +65,15 @@ async fn main() {
                 }
                 ShapeType::Capsule => {
                     let shape = shape.as_capsule().unwrap();
-                    draw_cylinder_wires(
-                        pos,
+                    draw_sphere_wires(
+                        pos + to_glam(shape.segment.a.coords),
                         shape.radius,
+                        None,
+                        body.color,
+                    );
+                    draw_sphere_wires(
+                        pos + to_glam(shape.segment.b.coords),
                         shape.radius,
-                        shape.height(),
                         None,
                         body.color,
                     );
@@ -80,7 +84,7 @@ async fn main() {
         world.update(delta);
 
         // quit the example
-        if is_quit_requested() || is_key_down(KeyCode::Escape) {
+        if is_quit_requested() {
             break;
         }
 
@@ -100,8 +104,8 @@ fn build_world() -> (World, Vec<Body>) {
             body
         },
         {
-            let mut body = Body::new_capsule([0.5, 15.0, 0.0], RED, Some(1.0), 1.0, 2.0);
-            body.set_velocity(&to_nalgebra([0.0, -1.0, 0.0]));
+            let mut body = Body::new_capsule([0.5, 15.0, 0.5], ORANGE, Some(1.0), 1.0, 2.0);
+            body.set_velocity(&to_nalgebra([0.0, -1.1, 0.0]));
             body
         },
     ];
@@ -174,7 +178,7 @@ enum BodyType {
 #[derive(Clone, Copy)]
 enum ShapeType {
     Box,
-    Sphere,
+    Ball,
     Capsule,
     Cylinder,
 }
@@ -193,13 +197,13 @@ impl Body {
         }
     }
 
-    fn new_sphere(pos: V3, color: Color, weight: Option<f32>, diameter: f32) -> Self {
+    fn new_ball(pos: V3, color: Color, weight: Option<f32>, diameter: f32) -> Self {
         let shape = Arc::new(Ball::new(diameter * 0.5));
         let (body_type, ptr) = make_body(pos, weight, shape);
         Self {
             body_type,
             ptr,
-            shape_type: ShapeType::Sphere,
+            shape_type: ShapeType::Ball,
             color,
         }
     }
