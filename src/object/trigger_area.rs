@@ -1,7 +1,13 @@
 //! Trigger zone which detect intersection with kinematic bodies
 
-use super::{CommonData, Mask, Object, OptPayload, WeakPayload, MASK_ALL};
-use crate::{object::kinematic_body::KinematicBody, world::aabb::Aabb};
+use super::{CommonData, Mask, Object, MASK_ALL};
+use crate::{
+    object::{
+        kinematic_body::KinematicBody,
+        payload::{SharedPayload, WeakPayload},
+    },
+    world::aabb::Aabb,
+};
 use alloc::sync::Arc;
 use bvh_arena::VolumeHandle;
 use delegate::delegate;
@@ -31,7 +37,7 @@ impl TriggerArea {
     pub fn new(
         shape: Arc<dyn Shape>,
         isometry: Isometry<Real>,
-        payload: OptPayload,
+        payload: SharedPayload,
         mask: Mask,
         overlap: Callback,
     ) -> Self {
@@ -51,7 +57,7 @@ impl Object for TriggerArea {
             fn handle(&self) -> Option<VolumeHandle>;
             fn shape(&self) -> &dyn Shape;
             fn isometry(&self) -> &Isometry<f32>;
-            fn payload(&self) -> OptPayload;
+            fn stored_payload(&self) -> SharedPayload;
         }
     }
 

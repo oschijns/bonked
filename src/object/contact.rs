@@ -1,6 +1,6 @@
 //! Contact between two solid objects
 
-use super::WeakPayload;
+use crate::object::payload::WeakPayload;
 use core::cmp::Ordering;
 use parry::{math::Real, query::ShapeCastHit};
 

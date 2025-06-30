@@ -36,7 +36,7 @@ impl World {
                     if let Some(hit) =
                         collides::<KinematicBody, StaticBody>(&mut_kine, &astatic, options)
                     {
-                        mut_kine.add_contact(hit, None, astatic.weak_payload());
+                        mut_kine.add_contact(hit, None, astatic.stored_payload().into());
                     }
                 });
         }
@@ -53,8 +53,12 @@ impl World {
                 if let Some(hit) =
                     collides::<KinematicBody, KinematicBody>(&mut_k1, &mut_k2, options)
                 {
-                    mut_k1.add_contact(hit, Some(mut_k2.weight()), mut_k2.weak_payload());
-                    mut_k2.add_contact(hit.swapped(), Some(mut_k1.weight()), mut_k1.weak_payload());
+                    mut_k1.add_contact(hit, Some(mut_k2.weight()), mut_k2.stored_payload().into());
+                    mut_k2.add_contact(
+                        hit.swapped(),
+                        Some(mut_k1.weight()),
+                        mut_k1.stored_payload().into(),
+                    );
                 }
             });
 
@@ -76,7 +80,7 @@ impl World {
                     if intersects::<KinematicBody, TriggerArea>(&mut_kine, &trigger) {
                         // the kinematic body intersect with this trigger area
                         // call the callback of the trigger on both
-                        trigger.on_overlap()(trigger.weak_payload(), &mut mut_kine)
+                        trigger.on_overlap()(trigger.stored_payload().into(), &mut mut_kine)
                     }
                 });
         }

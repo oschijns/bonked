@@ -9,27 +9,25 @@ pub mod static_body;
 /// Trigger area
 pub mod trigger_area;
 
+/// Arbitrary payload
+pub mod payload;
+
 /// Hit result between solid objects
 pub mod contact;
 
 use super::Mask;
-use crate::world::aabb::Aabb;
-use alloc::sync::{Arc, Weak};
+use crate::{object::payload::SharedPayload, world::aabb::Aabb};
+use alloc::sync::Arc;
 use bvh_arena::VolumeHandle;
 use parry::{
     math::{Isometry, Real, Vector},
     query::{self, Contact, ShapeCastHit, ShapeCastOptions},
     shape::Shape,
 };
+use payload::OptPayload;
 
 /// Mask where all bits are set to 1
 const MASK_ALL: Mask = Mask::MAX;
-
-/// Optional shared pointer to an arbitrary payload
-type OptPayload = Option<Arc<dyn Payload>>;
-
-/// Weak shared pointer to an arbitrary payload
-type WeakPayload = Option<Weak<dyn Payload>>;
 
 /// Trait implemented for static and dynamic bodies
 pub trait Object {
@@ -52,12 +50,12 @@ pub trait Object {
     fn aabb(&self) -> Aabb;
 
     /// Access the payload defined on this object
-    fn payload(&self) -> OptPayload;
+    fn stored_payload(&self) -> SharedPayload;
 
-    /// Access the payload defined on this object
+    /// Access the payload in a usable state
     #[inline]
-    fn weak_payload(&self) -> WeakPayload {
-        self.payload().map(|p| Arc::downgrade(&p))
+    fn get_payload(&self) -> OptPayload {
+        self.stored_payload().get()
     }
 
     /// Get the layer(s) this body belongs to
@@ -90,22 +88,14 @@ struct CommonData {
     /// Isometry of this body
     isometry: Isometry<Real>,
 
-    /// Arbitrary payload.
-    /// For example can be used to store a pointer to the actual game object
-    /// associated with this physics object.
-    payload: OptPayload,
-}
-
-/// Arbitrary payload that can be stored in a physics object
-pub trait Payload {
-    /// Identify the type of payload
-    fn payload_type(&self) -> usize;
+    /// Arbitrary payload
+    payload: SharedPayload,
 }
 
 impl CommonData {
     /// Create a new common data instance
     #[inline]
-    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, payload: OptPayload) -> Self {
+    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, payload: SharedPayload) -> Self {
         CommonData {
             handle: None,
             shape,
@@ -154,7 +144,7 @@ impl Object for CommonData {
 
     /// Access the payload defined on this object
     #[inline]
-    fn payload(&self) -> OptPayload {
+    fn stored_payload(&self) -> SharedPayload {
         self.payload.clone()
     }
 }

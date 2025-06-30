@@ -1,7 +1,7 @@
 //! Fixed body which does not report collisions
 
-use super::{CommonData, Mask, Object, OptPayload, MASK_ALL};
-use crate::world::aabb::Aabb;
+use super::{CommonData, Mask, Object, MASK_ALL};
+use crate::{object::payload::SharedPayload, world::aabb::Aabb};
 use alloc::sync::Arc;
 use bvh_arena::VolumeHandle;
 use delegate::delegate;
@@ -25,7 +25,7 @@ impl StaticBody {
     pub fn new(
         shape: Arc<dyn Shape>,
         isometry: Isometry<Real>,
-        payload: OptPayload,
+        payload: SharedPayload,
         layer: Mask,
     ) -> Self {
         Self {
@@ -43,7 +43,7 @@ impl Object for StaticBody {
             fn handle(&self) -> Option<VolumeHandle>;
             fn shape(&self) -> &dyn Shape;
             fn isometry(&self) -> &Isometry<f32>;
-            fn payload(&self) -> OptPayload;
+            fn stored_payload(&self) -> SharedPayload;
         }
     }
 

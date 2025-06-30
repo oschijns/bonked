@@ -1,7 +1,13 @@
 //! Kinematic body which reports collisions
 
-use super::{CommonData, Mask, Object, OptPayload, WeakPayload};
-use crate::{object::contact::Contact, world::aabb::Aabb};
+use super::{CommonData, Mask, Object};
+use crate::{
+    object::{
+        contact::Contact,
+        payload::{SharedPayload, WeakPayload},
+    },
+    world::aabb::Aabb,
+};
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use bvh_arena::VolumeHandle;
 use delegate::delegate;
@@ -26,6 +32,9 @@ pub struct KinematicBody {
     /// Weight of this object, define how two objects can push against each other
     weight: Real,
 
+    /// Specify if this object will bounce off other surfaces
+    bounce: bool,
+
     /// Velocity of the object.
     /// It can be accessed directly to modify each coordinate individually.
     pub velocity: Vector<Real>,
@@ -44,16 +53,18 @@ impl KinematicBody {
     pub fn new(
         shape: Arc<dyn Shape>,
         isometry: Isometry<Real>,
-        payload: OptPayload,
+        payload: SharedPayload,
         layer: Mask,
         mask: Mask,
         weight: Real,
+        bounce: bool,
     ) -> Self {
         Self {
             common: CommonData::new(shape, isometry, payload),
             layer,
             mask,
             weight,
+            bounce,
             velocity: Vector::zeros(),
             next_isometry: isometry,
             contacts: Vec::new(),
@@ -69,7 +80,7 @@ impl Object for KinematicBody {
             fn handle(&self) -> Option<VolumeHandle>;
             fn shape(&self) -> &dyn Shape;
             fn isometry(&self) -> &Isometry<f32>;
-            fn payload(&self) -> OptPayload;
+            fn stored_payload(&self) -> SharedPayload;
         }
     }
 
@@ -169,8 +180,17 @@ impl KinematicBody {
             // push back the object
             offset -= normal * (hit.time_of_impact * ratio);
 
-            // cut off form the velocity
-            self.velocity -= normal * (normal.dot(&self.velocity) * ratio);
+            // The dot product specify if the angle
+            // between the two vectors is accute or obtuse.
+            let dot = normal.dot(&self.velocity);
+            let push_back = normal * (dot * ratio);
+            if dot > 0.0 {
+                // angle is accute => cut off from the velocity
+                self.velocity -= push_back;
+            } else if self.bounce {
+                // angle is obtuse => add to the velocity
+                self.velocity += push_back;
+            }
         }
 
         // check if the push back is relevant

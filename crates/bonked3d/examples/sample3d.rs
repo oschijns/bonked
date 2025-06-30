@@ -1,8 +1,11 @@
 use bonked3d::{
     make_shared,
     object::{
-        kinematic_body::KinematicBody, static_body::StaticBody, trigger_area::TriggerArea, Object,
-        Payload,
+        kinematic_body::KinematicBody,
+        payload::{Payload, SharedPayload, WeakPayload},
+        static_body::StaticBody,
+        trigger_area::TriggerArea,
+        Object,
     },
     world::World,
 };
@@ -12,10 +15,7 @@ use parry3d::{
     shape::{Ball, Capsule, Cuboid, Cylinder, Shape},
 };
 use spin::RwLock;
-use std::{
-    sync::{Arc, Weak},
-    u32,
-};
+use std::{any::Any, sync::Arc, u32};
 
 #[macroquad::main("3D")]
 async fn main() {
@@ -119,8 +119,16 @@ fn build_world() -> (World, Vec<Body>) {
         Body::new_box(
             [5.0, 2.5, 5.0],
             MAGENTA,
-            BodyData::Trigger(|_, _| {
-                println!("Object hit trigger !");
+            BodyData::Trigger(|flag: WeakPayload, _| {
+                if let Some(flag) = flag.get() {
+                    let mut flag_guard = flag.write();
+                    if let Some(flag) = flag_guard.as_any_mut().downcast_mut::<Flag>() {
+                        if !flag.0 {
+                            flag.0 = true;
+                            println!("Object hit trigger !");
+                        }
+                    }
+                }
             }),
             [5.0, 5.0, 5.0],
         ),
@@ -204,7 +212,7 @@ enum ShapeType {
 enum BodyData {
     Static,
     Kinematic(f32),
-    Trigger(fn(Option<Weak<dyn Payload>>, &mut KinematicBody)),
+    Trigger(fn(WeakPayload, &mut KinematicBody)),
 }
 
 type V3 = [f32; 3];
@@ -273,24 +281,48 @@ fn make_body(
     let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
     match data {
         BodyData::Static => {
-            let ptr = make_shared(StaticBody::new(shape, pos, None, u32::MAX));
+            let ptr = make_shared(StaticBody::new(shape, pos, SharedPayload::None, u32::MAX));
             (BodyType::Static(ptr.clone()), ptr)
         }
         BodyData::Kinematic(weight) => {
             let ptr = make_shared(KinematicBody::new(
                 shape,
                 pos,
-                None,
+                SharedPayload::None,
                 u32::MAX,
                 u32::MAX,
                 weight,
+                false,
             ));
             (BodyType::Kinematic(ptr.clone()), ptr)
         }
         BodyData::Trigger(callback) => {
-            let ptr = make_shared(TriggerArea::new(shape, pos, None, u32::MAX, callback));
+            let ptr = make_shared(TriggerArea::new(
+                shape,
+                pos,
+                SharedPayload::new(Flag::default()),
+                u32::MAX,
+                callback,
+            ));
             (BodyType::Trigger(ptr.clone()), ptr)
         }
+    }
+}
+
+#[derive(Default)]
+struct Flag(bool);
+
+impl Payload for Flag {
+    fn payload_type(&self) -> usize {
+        0
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
