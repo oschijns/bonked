@@ -1,10 +1,9 @@
 //! Kinematic body which reports collisions
 
-use super::{CommonData, Mask, Object};
-use crate::world::aabb::Aabb;
+use super::{CommonData, Mask, Object, OptPayload, WeakPayload};
+use crate::{object::contact::Contact, world::aabb::Aabb};
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use bvh_arena::VolumeHandle;
-use core::cmp::Ordering;
 use delegate::delegate;
 use nalgebra_glm::is_null;
 use parry::{
@@ -14,9 +13,9 @@ use parry::{
 };
 
 /// A kinematic body in the world
-pub struct KinematicBody<P = ()> {
+pub struct KinematicBody {
     /// Shape, isometry and handle
-    common: CommonData<P>,
+    common: CommonData,
 
     /// Collision layer of the body
     layer: Mask,
@@ -37,24 +36,15 @@ pub struct KinematicBody<P = ()> {
     /// Store collision results
     /// Hit results are stored in boxes so that reordoring the vector can be quicker
     #[allow(clippy::vec_box)]
-    hits: Vec<Box<HitResult>>,
+    contacts: Vec<Box<Contact>>,
 }
 
-/// Hit result
-pub struct HitResult {
-    /// parry's shape cast hit
-    hit: ShapeCastHit,
-
-    /// weight ratio between this object and the object being hit
-    weight_ratio: Real,
-}
-
-impl<P> KinematicBody<P> {
+impl KinematicBody {
     /// Create a new kinematic body
     pub fn new(
         shape: Arc<dyn Shape>,
         isometry: Isometry<Real>,
-        payload: P,
+        payload: OptPayload,
         layer: Mask,
         mask: Mask,
         weight: Real,
@@ -66,12 +56,12 @@ impl<P> KinematicBody<P> {
             weight,
             velocity: Vector::zeros(),
             next_isometry: isometry,
-            hits: Vec::new(),
+            contacts: Vec::new(),
         }
     }
 }
 
-impl<P> Object<P> for KinematicBody<P> {
+impl Object for KinematicBody {
     delegate! {
         to self.common {
             fn set_handle(&mut self, handle: VolumeHandle);
@@ -79,8 +69,7 @@ impl<P> Object<P> for KinematicBody<P> {
             fn handle(&self) -> Option<VolumeHandle>;
             fn shape(&self) -> &dyn Shape;
             fn isometry(&self) -> &Isometry<f32>;
-            fn payload(&self) -> &P;
-            fn payload_mut(&mut self) -> &mut P;
+            fn payload(&self) -> OptPayload;
         }
     }
 
@@ -115,7 +104,7 @@ impl<P> Object<P> for KinematicBody<P> {
     }
 }
 
-impl<P> KinematicBody<P> {
+impl KinematicBody {
     /// Compute the estimated next isometry by applying the velocity
     pub fn pre_update(&mut self, delta_time: Real) {
         // submit the computed new isometry
@@ -127,7 +116,7 @@ impl<P> KinematicBody<P> {
         self.next_isometry.append_translation_mut(&translation);
 
         // Reset the list of hits
-        self.hits.clear();
+        self.contacts.clear();
     }
 
     /// Access the weight of the kinematic body
@@ -144,7 +133,12 @@ impl<P> KinematicBody<P> {
 
     /// Apply the collision to this body
     #[inline]
-    pub fn add_hit(&mut self, hit: ShapeCastHit, other_weight: Option<Real>) {
+    pub fn add_contact(
+        &mut self,
+        hit: ShapeCastHit,
+        other_weight: Option<Real>,
+        payload: WeakPayload,
+    ) {
         // Compare the weight of the two object to deduce
         // which one should push back the other more.
         let weight_ratio = if let Some(w) = other_weight {
@@ -155,23 +149,25 @@ impl<P> KinematicBody<P> {
         };
 
         // add the hit result to the set
-        self.hits.push(Box::new(HitResult { hit, weight_ratio }));
+        self.contacts
+            .push(Box::new(Contact::new(hit, weight_ratio, payload)));
     }
 
     /// Apply the hits to the body
-    pub fn apply_hits(&mut self, delta_time: Real, epsilon: Real) {
+    pub fn apply_contacts(&mut self, delta_time: Real, epsilon: Real) {
         // order the hits from closest to furthest
-        self.hits.sort_by(|a, b| a.order(b, epsilon));
+        self.contacts.sort_by(|a, b| a.order(b, epsilon));
 
         // Compute how much we must push back the object
         let mut offset = Vector::<Real>::zeros();
-        for hit in self.hits.iter() {
+        for contact in self.contacts.iter() {
             // push back the object according to its mass
-            let normal = hit.hit.normal1.into_inner();
-            let ratio = hit.weight_ratio;
+            let hit = contact.hit();
+            let normal = hit.normal1.into_inner();
+            let ratio = contact.weight_ratio();
 
             // push back the object
-            offset -= normal * (hit.hit.time_of_impact * ratio);
+            offset -= normal * (hit.time_of_impact * ratio);
 
             // cut off form the velocity
             self.velocity -= normal * (normal.dot(&self.velocity) * ratio);
@@ -182,20 +178,6 @@ impl<P> KinematicBody<P> {
             // apply the push back to the position of the object
             let translation = Translation::from(offset * delta_time);
             self.next_isometry.append_translation_mut(&translation);
-        }
-    }
-}
-
-impl HitResult {
-    fn order(&self, other: &Self, epsilon: Real) -> Ordering {
-        let ta = self.hit.time_of_impact;
-        let tb = other.hit.time_of_impact;
-        if (ta - tb).abs() < epsilon {
-            Ordering::Equal
-        } else if ta < tb {
-            Ordering::Less
-        } else {
-            Ordering::Greater
         }
     }
 }

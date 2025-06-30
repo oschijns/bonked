@@ -1,6 +1,6 @@
 //! Fixed body which does not report collisions
 
-use super::{CommonData, Mask, Object, MASK_ALL};
+use super::{CommonData, Mask, Object, OptPayload, MASK_ALL};
 use crate::world::aabb::Aabb;
 use alloc::sync::Arc;
 use bvh_arena::VolumeHandle;
@@ -11,18 +11,23 @@ use parry::{
 };
 
 /// A fixed body in the world
-pub struct StaticBody<P = ()> {
+pub struct StaticBody {
     /// Shape, isometry and handle
-    common: CommonData<P>,
+    common: CommonData,
 
     /// Specify the layer this body belongs to
     layer: Mask,
 }
 
-impl<P> StaticBody<P> {
+impl StaticBody {
     /// Build a new static body
     #[inline]
-    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, payload: P, layer: Mask) -> Self {
+    pub fn new(
+        shape: Arc<dyn Shape>,
+        isometry: Isometry<Real>,
+        payload: OptPayload,
+        layer: Mask,
+    ) -> Self {
         Self {
             common: CommonData::new(shape, isometry, payload),
             layer,
@@ -30,7 +35,7 @@ impl<P> StaticBody<P> {
     }
 }
 
-impl<P> Object<P> for StaticBody<P> {
+impl Object for StaticBody {
     delegate! {
         to self.common {
             fn set_handle(&mut self, handle: VolumeHandle);
@@ -38,8 +43,7 @@ impl<P> Object<P> for StaticBody<P> {
             fn handle(&self) -> Option<VolumeHandle>;
             fn shape(&self) -> &dyn Shape;
             fn isometry(&self) -> &Isometry<f32>;
-            fn payload(&self) -> &P;
-            fn payload_mut(&mut self) -> &mut P;
+            fn payload(&self) -> OptPayload;
         }
     }
 

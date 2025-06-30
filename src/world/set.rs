@@ -81,12 +81,12 @@ impl<O> Set<O> {
     }
 }
 
-impl<O> Set<O> {
+impl<O> Set<O>
+where
+    O: Object,
+{
     /// Store the element and add it to the partition too
-    pub fn add<P>(&mut self, object: Shared<O>)
-    where
-        O: Object<P>,
-    {
+    pub fn add(&mut self, object: Shared<O>) {
         // add the object to the list
         self.objects.push(object.clone());
 
@@ -97,10 +97,7 @@ impl<O> Set<O> {
     }
 
     /// Remove an element from this set
-    pub fn clean_remove<P>(&mut self, object: &Shared<O>) -> bool
-    where
-        O: Object<P>,
-    {
+    pub fn clean_remove(&mut self, object: &Shared<O>) -> bool {
         // find the position of the object in the list
         for (index, value) in self.objects.iter().enumerate() {
             if Arc::ptr_eq(object, value) {
@@ -125,15 +122,19 @@ impl<O> Set<O> {
     }
 
     /// Compute a partitionning for the objects defined in this set
-    pub fn repartition<P>(&mut self)
-    where
-        O: Object<P>,
-    {
+    pub fn repartition(&mut self) {
         self.partition.clear();
         for object in &self.objects {
             let mut mut_obj = object.write();
             let handle = self.partition.insert(object.clone(), mut_obj.aabb());
             mut_obj.set_handle(handle);
         }
+    }
+
+    /// Performs an overlap query between a provided AABB and this set.
+    /// This can be used to implement specific behaviors.
+    #[inline]
+    pub fn query(&self, aabb: &Aabb, on_overlap: impl FnMut(&Shared<O>)) {
+        self.partition.for_each_overlaps(aabb, on_overlap);
     }
 }

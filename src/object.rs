@@ -9,9 +9,12 @@ pub mod static_body;
 /// Trigger area
 pub mod trigger_area;
 
+/// Hit result between solid objects
+pub mod contact;
+
 use super::Mask;
 use crate::world::aabb::Aabb;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use bvh_arena::VolumeHandle;
 use parry::{
     math::{Isometry, Real, Vector},
@@ -22,8 +25,14 @@ use parry::{
 /// Mask where all bits are set to 1
 const MASK_ALL: Mask = Mask::MAX;
 
+/// Optional shared pointer to an arbitrary payload
+type OptPayload = Option<Arc<dyn Payload>>;
+
+/// Weak shared pointer to an arbitrary payload
+type WeakPayload = Option<Weak<dyn Payload>>;
+
 /// Trait implemented for static and dynamic bodies
-pub trait Object<P = ()> {
+pub trait Object {
     /// Store the handle of this object after it has been added to the world
     fn set_handle(&mut self, handle: VolumeHandle);
 
@@ -43,10 +52,13 @@ pub trait Object<P = ()> {
     fn aabb(&self) -> Aabb;
 
     /// Access the payload defined on this object
-    fn payload(&self) -> &P;
+    fn payload(&self) -> OptPayload;
 
-    /// Mutable access to the payload defined on this object
-    fn payload_mut(&mut self) -> &mut P;
+    /// Access the payload defined on this object
+    #[inline]
+    fn weak_payload(&self) -> WeakPayload {
+        self.payload().map(|p| Arc::downgrade(&p))
+    }
 
     /// Get the layer(s) this body belongs to
     #[inline]
@@ -68,7 +80,7 @@ pub trait Object<P = ()> {
 }
 
 /// Common data shared between static and dynamic bodies
-struct CommonData<P = ()> {
+struct CommonData {
     /// Handle of this body in the world
     handle: Option<VolumeHandle>,
 
@@ -79,15 +91,21 @@ struct CommonData<P = ()> {
     isometry: Isometry<Real>,
 
     /// Arbitrary payload.
-    /// For example can be used to store a pointer to the
-    /// actual game object associated with this physics object.
-    payload: P,
+    /// For example can be used to store a pointer to the actual game object
+    /// associated with this physics object.
+    payload: OptPayload,
 }
 
-impl<P> CommonData<P> {
+/// Arbitrary payload that can be stored in a physics object
+pub trait Payload {
+    /// Identify the type of payload
+    fn payload_type(&self) -> usize;
+}
+
+impl CommonData {
     /// Create a new common data instance
     #[inline]
-    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, payload: P) -> Self {
+    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, payload: OptPayload) -> Self {
         CommonData {
             handle: None,
             shape,
@@ -97,7 +115,7 @@ impl<P> CommonData<P> {
     }
 }
 
-impl<P> Object<P> for CommonData<P> {
+impl Object for CommonData {
     /// Store the handle of this object after it has been added to the world
     #[inline]
     fn set_handle(&mut self, handle: VolumeHandle) {
@@ -136,43 +154,37 @@ impl<P> Object<P> for CommonData<P> {
 
     /// Access the payload defined on this object
     #[inline]
-    fn payload(&self) -> &P {
-        &self.payload
-    }
-
-    /// Mutable access to the payload defined on this object
-    #[inline]
-    fn payload_mut(&mut self) -> &mut P {
-        &mut self.payload
+    fn payload(&self) -> OptPayload {
+        self.payload.clone()
     }
 }
 
 /// Check if two objects intersects
 #[inline]
-pub fn intersects<A, PA, B, PB>(a: &A, b: &B) -> bool
+pub fn intersects<A, B>(a: &A, b: &B) -> bool
 where
-    A: Object<PA>,
-    B: Object<PB>,
+    A: Object,
+    B: Object,
 {
     query::intersection_test(a.isometry(), a.shape(), b.isometry(), b.shape()).unwrap_or(false)
 }
 
 /// Check if two objects are in contact
 #[inline]
-pub fn contacts<A, PA, B, PB>(a: &A, b: &B, prediction: Real) -> Option<Contact>
+pub fn contacts<A, B>(a: &A, b: &B, prediction: Real) -> Option<Contact>
 where
-    A: Object<PA>,
-    B: Object<PB>,
+    A: Object,
+    B: Object,
 {
     query::contact(a.isometry(), a.shape(), b.isometry(), b.shape(), prediction).unwrap_or(None)
 }
 
 /// Check if two objects will collide
 #[inline]
-pub fn collides<A, PA, B, PB>(a: &A, b: &B, options: ShapeCastOptions) -> Option<ShapeCastHit>
+pub fn collides<A, B>(a: &A, b: &B, options: ShapeCastOptions) -> Option<ShapeCastHit>
 where
-    A: Object<PA>,
-    B: Object<PB>,
+    A: Object,
+    B: Object,
 {
     query::cast_shapes(
         a.isometry(),

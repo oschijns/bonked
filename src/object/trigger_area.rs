@@ -1,6 +1,6 @@
 //! Trigger zone which detect intersection with kinematic bodies
 
-use super::{CommonData, Mask, Object, MASK_ALL};
+use super::{CommonData, Mask, Object, OptPayload, WeakPayload, MASK_ALL};
 use crate::{object::kinematic_body::KinematicBody, world::aabb::Aabb};
 use alloc::sync::Arc;
 use bvh_arena::VolumeHandle;
@@ -11,29 +11,29 @@ use parry::{
 };
 
 /// Callback function to assign to a trigger
-pub type Callback<PT, PK> = fn(&mut PT, &mut KinematicBody<PK>);
+pub type Callback = fn(WeakPayload, &mut KinematicBody);
 
 /// A trigger zone in the world
-pub struct TriggerArea<PT = (), PK = ()> {
+pub struct TriggerArea {
     /// Shape, isometry and handle
-    common: CommonData<PT>,
+    common: CommonData,
 
     /// Layers this trigger zone can detect objects on
     mask: Mask,
 
     /// Function called when this trigger area overlap with a kinematic body
-    overlap: Callback<PT, PK>,
+    overlap: Callback,
 }
 
-impl<PT, PK> TriggerArea<PT, PK> {
+impl TriggerArea {
     /// Create a new trigger area
     #[inline]
     pub fn new(
         shape: Arc<dyn Shape>,
         isometry: Isometry<Real>,
-        payload: PT,
+        payload: OptPayload,
         mask: Mask,
-        overlap: Callback<PT, PK>,
+        overlap: Callback,
     ) -> Self {
         Self {
             common: CommonData::new(shape, isometry, payload),
@@ -43,7 +43,7 @@ impl<PT, PK> TriggerArea<PT, PK> {
     }
 }
 
-impl<PT, PK> Object<PT> for TriggerArea<PT, PK> {
+impl Object for TriggerArea {
     delegate! {
         to self.common {
             fn set_handle(&mut self, handle: VolumeHandle);
@@ -51,8 +51,7 @@ impl<PT, PK> Object<PT> for TriggerArea<PT, PK> {
             fn handle(&self) -> Option<VolumeHandle>;
             fn shape(&self) -> &dyn Shape;
             fn isometry(&self) -> &Isometry<f32>;
-            fn payload(&self) -> &PT;
-            fn payload_mut(&mut self) -> &mut PT;
+            fn payload(&self) -> OptPayload;
         }
     }
 
@@ -72,10 +71,10 @@ impl<PT, PK> Object<PT> for TriggerArea<PT, PK> {
     }
 }
 
-impl<PT, PK> TriggerArea<PT, PK> {
+impl TriggerArea {
     /// Access the callback defined for when this area overlap with a body
     #[inline]
-    pub fn on_overlap(&self) -> Callback<PT, PK> {
+    pub fn on_overlap(&self) -> Callback {
         self.overlap
     }
 }

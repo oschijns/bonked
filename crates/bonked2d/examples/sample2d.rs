@@ -2,6 +2,7 @@ use bonked2d::{
     make_shared,
     object::{
         kinematic_body::KinematicBody, static_body::StaticBody, trigger_area::TriggerArea, Object,
+        Payload,
     },
     world::World,
 };
@@ -11,7 +12,10 @@ use parry2d::{
     shape::{Ball, Capsule, Cuboid, Shape},
 };
 use spin::RwLock;
-use std::{sync::Arc, u32};
+use std::{
+    sync::{Arc, Weak},
+    u32,
+};
 
 #[macroquad::main("2D")]
 async fn main() {
@@ -167,7 +171,7 @@ enum ShapeType {
 enum BodyData {
     Static,
     Kinematic(f32),
-    Trigger(fn(&mut (), &mut KinematicBody)),
+    Trigger(fn(Option<Weak<dyn Payload>>, &mut KinematicBody)),
 }
 
 type V2 = [f32; 2];
@@ -225,14 +229,14 @@ fn make_body(
     let pos = Isometry::new(to_nalgebra(pos), 0.0);
     match data {
         BodyData::Static => {
-            let ptr = make_shared(StaticBody::new(shape, pos, (), u32::MAX));
+            let ptr = make_shared(StaticBody::new(shape, pos, None, u32::MAX));
             (BodyType::Static(ptr.clone()), ptr)
         }
         BodyData::Kinematic(weight) => {
             let ptr = make_shared(KinematicBody::new(
                 shape,
                 pos,
-                (),
+                None,
                 u32::MAX,
                 u32::MAX,
                 weight,
@@ -240,7 +244,7 @@ fn make_body(
             (BodyType::Kinematic(ptr.clone()), ptr)
         }
         BodyData::Trigger(callback) => {
-            let ptr = make_shared(TriggerArea::new(shape, pos, (), u32::MAX, callback));
+            let ptr = make_shared(TriggerArea::new(shape, pos, None, u32::MAX, callback));
             (BodyType::Trigger(ptr.clone()), ptr)
         }
     }
