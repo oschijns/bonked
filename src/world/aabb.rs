@@ -28,10 +28,16 @@ impl Aabb {
     }
 
     /// Create a new AABB from a ray
-    pub fn from_ray(ray: &Ray, max_time_of_impact: Real, mask: Mask) -> Self {
+    pub fn from_ray(ray: &Ray, max_time_of_impact: Real, layer: Mask, mask: Mask) -> Self {
         let (mins, maxs) = ray.origin.coords.inf_sup(&(ray.dir * max_time_of_impact));
         let aabb = p::Aabb::new(Point::from(mins), Point::from(maxs));
-        Self::new(aabb, Mask::MAX, mask)
+        Self::new(aabb, layer, mask)
+    }
+
+    /// Create a new AABB from a point
+    pub fn from_point(point: &Point<Real>, layer: Mask, mask: Mask) -> Self {
+        let aabb = p::Aabb::new(*point, *point);
+        Self::new(aabb, layer, mask)
     }
 
     /// Access the Parry's Axis-Aligned Bounding Box

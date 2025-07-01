@@ -10,5 +10,5 @@ other. Physics objects are filtered into three categories:
 
 The library also support a few queries:
 - Raycasts against solid bodies.
-- ~~Shapecasts against solid bodies.~~
-- ~~Pointcasts against trigger areas.~~
+- Shape queries against solid bodies.
+- Point queries against trigger areas.

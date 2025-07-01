@@ -1,15 +1,16 @@
 use super::World;
 use crate::{
+    Mask, Shared,
     object::{
-        collides, intersects, kinematic_body::KinematicBody, static_body::StaticBody,
-        trigger_area::TriggerArea, Object,
+        Object, collides, intersects, kinematic_body::KinematicBody, static_body::StaticBody,
+        trigger_area::TriggerArea,
     },
     world::aabb::Aabb,
-    Mask, Shared,
 };
 use parry::{
-    math::Real,
-    query::{Ray, RayIntersection, ShapeCastOptions},
+    math::{Isometry, Point, Real},
+    query::{Contact, Ray, RayIntersection, ShapeCastOptions, contact},
+    shape::Shape,
 };
 
 impl<B, T> World<T, B>
@@ -100,12 +101,10 @@ impl<B, T> World<T, B> {
         hit_statics: bool,
         hit_kinematics: bool,
     ) -> RayResult<B> {
-        // Define the AABB around the ray
-        let aabb = Aabb::from_ray(ray, max_time_of_impact, mask);
-
         // Try to find the best candidate
         let mut found = RayResult::None;
         let mut time = Real::MAX;
+        let aabb = Aabb::from_ray(ray, max_time_of_impact, Mask::MAX, mask);
 
         // Check static bodies
         if hit_statics {
@@ -178,3 +177,66 @@ pub enum RayResult<P> {
         object: Shared<KinematicBody<P>>,
     },
 }
+
+impl<B, T> World<T, B> {
+    /// Perform a pointcast with the trigger areas in this world
+    pub fn point_query_areas<F>(
+        &self,
+        point: &Point<Real>,
+        layer: Mask,
+        mut when_inside: F,
+    ) -> usize
+    where
+        F: FnMut(&mut TriggerArea<T, B>),
+    {
+        // Count the number of area containing this point
+        let mut count = 0;
+        let aabb = Aabb::from_point(point, layer, Mask::MAX);
+        self.trigger_set.partition.for_each_overlaps(&aabb, |area| {
+            let mut a = area.write();
+            if a.shape().contains_point(a.isometry(), point) {
+                count += 1;
+                (when_inside)(&mut a);
+            }
+        });
+        count
+    }
+}
+
+macro_rules! impl_shape_query {
+    ( $method:ident ( $atype:ident ) { $set:ident } ) => {
+        impl<B, T> World<T, B> {
+            pub fn $method<F>(
+                &self,
+                shape: &dyn Shape,
+                isometry: &Isometry<Real>,
+                mask: Mask,
+                prediction: Real,
+                mut on_intersect: F,
+            ) -> usize
+            where
+                F: FnMut(&mut $atype<B>, &Contact),
+            {
+                // Count the number of bodies encountered
+                let mut count = 0;
+                let aabb = Aabb::new(shape.compute_aabb(isometry), Mask::MAX, mask);
+                self.$set.partition.for_each_overlaps(&aabb, |body| {
+                    let mut b = body.write();
+
+                    // check if there is a contact
+                    if let Some(contact) =
+                        contact(isometry, shape, b.isometry(), b.shape(), prediction)
+                            .map_or(None, |c| c)
+                    {
+                        count += 1;
+                        (on_intersect)(&mut b, &contact);
+                    }
+                });
+                count
+            }
+        }
+    };
+}
+
+impl_shape_query![ shape_query_kinematics ( KinematicBody ) { kinematic_set } ];
+impl_shape_query![ shape_query_statics    ( StaticBody    ) { static_set    } ];
