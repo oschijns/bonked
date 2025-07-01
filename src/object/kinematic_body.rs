@@ -1,13 +1,7 @@
 //! Kinematic body which reports collisions
 
 use super::{CommonData, Mask, Object};
-use crate::{
-    object::{
-        contact::Contact,
-        payload::{SharedPayload, WeakPayload},
-    },
-    world::aabb::Aabb,
-};
+use crate::{object::contact::Contact, world::aabb::Aabb};
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use bvh_arena::VolumeHandle;
 use delegate::delegate;
@@ -19,9 +13,9 @@ use parry::{
 };
 
 /// A kinematic body in the world
-pub struct KinematicBody {
+pub struct KinematicBody<P = ()> {
     /// Shape, isometry and handle
-    common: CommonData,
+    common: CommonData<P>,
 
     /// Collision layer of the body
     layer: Mask,
@@ -45,15 +39,15 @@ pub struct KinematicBody {
     /// Store collision results
     /// Hit results are stored in boxes so that reordoring the vector can be quicker
     #[allow(clippy::vec_box)]
-    contacts: Vec<Box<Contact>>,
+    contacts: Vec<Box<Contact<P>>>,
 }
 
-impl KinematicBody {
+impl<P> KinematicBody<P> {
     /// Create a new kinematic body
     pub fn new(
         shape: Arc<dyn Shape>,
         isometry: Isometry<Real>,
-        payload: SharedPayload,
+        payload: P,
         layer: Mask,
         mask: Mask,
         weight: Real,
@@ -72,15 +66,18 @@ impl KinematicBody {
     }
 }
 
-impl Object for KinematicBody {
+impl<P> Object for KinematicBody<P> {
+    type Payload = P;
+
     delegate! {
         to self.common {
-            fn set_handle(&mut self, handle: VolumeHandle);
-            fn unset_handle(&mut self);
-            fn handle(&self) -> Option<VolumeHandle>;
-            fn shape(&self) -> &dyn Shape;
-            fn isometry(&self) -> &Isometry<f32>;
-            fn stored_payload(&self) -> SharedPayload;
+            #[inline] fn set_handle(&mut self, handle: VolumeHandle);
+            #[inline] fn unset_handle(&mut self);
+            #[inline] fn handle(&self) -> Option<VolumeHandle>;
+            #[inline] fn shape(&self) -> &dyn Shape;
+            #[inline] fn isometry(&self) -> &Isometry<Real>;
+            #[inline] fn payload(&self) -> &P;
+            #[inline] fn payload_mut(&mut self) -> &mut P;
         }
     }
 
@@ -113,9 +110,15 @@ impl Object for KinematicBody {
     fn velocity(&self) -> Vector<Real> {
         self.velocity
     }
+
+    /// Try to cast the object into a kinematic body
+    #[inline]
+    fn as_kinematic(&self) -> Option<&KinematicBody<Self::Payload>> {
+        Some(self)
+    }
 }
 
-impl KinematicBody {
+impl<P> KinematicBody<P> {
     /// Compute the estimated next isometry by applying the velocity
     pub fn pre_update(&mut self, delta_time: Real) {
         // submit the computed new isometry
@@ -144,12 +147,7 @@ impl KinematicBody {
 
     /// Apply the collision to this body
     #[inline]
-    pub fn add_contact(
-        &mut self,
-        hit: ShapeCastHit,
-        other_weight: Option<Real>,
-        payload: WeakPayload,
-    ) {
+    pub fn add_contact(&mut self, hit: ShapeCastHit, other_weight: Option<Real>, payload: P) {
         // Compare the weight of the two object to deduce
         // which one should push back the other more.
         let weight_ratio = if let Some(w) = other_weight {

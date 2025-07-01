@@ -1,16 +1,14 @@
-# bonked
-Simple ECS physics engine for embedded systems
+# Bonked!
+A simple collision engine for retro console development.
 
-## Status
-This library does not work in its current state.
-I initially planed for the library user to implement their own collision accumulator.
-But this actually cause a lot of issues.
+Contrary to fully fledge physics engine such as Rapier or Avian, Bonked! only
+supports basic features such as preventing solid objects to pass through each
+other. Physics objects are filtered into three categories:
+- Kinematic bodies which are intended to move over time.
+- Static bodies which should not move at all.
+- Trigger areas which can trigger events when kinematic bodies pass through them.
 
-This library was intended for providing a basic physics engine for old consoles.
-But it doesn't provide proper solution for neither 2D nor 3D games.
-For old 2D game consoles, which usually only support 2D tiles, you would prefer 
-to base your collision system on tiles instead of arbitrary rotated 2D shapes.
-For 3D games, primitives are to restrictive, and most games were instead based on mesh collisions.
-
-This library could be reworked for making space shooters,
-which would be a type of game better suited for the feature offered byt this library.
+The library also support a few queries:
+- Raycasts against solid bodies.
+- ~~Shapecasts against solid bodies.~~
+- ~~Pointcasts against trigger areas.~~

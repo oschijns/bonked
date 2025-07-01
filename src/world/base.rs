@@ -5,15 +5,18 @@ use crate::{
         trigger_area::TriggerArea, Object,
     },
     world::aabb::Aabb,
-    Mask,
+    Mask, Shared,
 };
 use parry::{
-    math::{Isometry, Real},
+    math::Real,
     query::{Ray, RayIntersection, ShapeCastOptions},
-    shape::Shape,
 };
 
-impl World {
+impl<B, T> World<T, B>
+where
+    B: Clone,
+    T: Clone,
+{
     /// Update the state of the world
     pub fn update(&mut self, delta_time: Real) {
         // Options for kinematic bodies collisions
@@ -34,9 +37,9 @@ impl World {
                     // apply the result to the kinematic body
                     let astatic = astatic.read();
                     if let Some(hit) =
-                        collides::<KinematicBody, StaticBody>(&mut_kine, &astatic, options)
+                        collides::<KinematicBody<B>, StaticBody<B>>(&mut_kine, &astatic, options)
                     {
-                        mut_kine.add_contact(hit, None, astatic.stored_payload().into());
+                        mut_kine.add_contact(hit, None, astatic.payload().clone());
                     }
                 });
         }
@@ -51,13 +54,13 @@ impl World {
                 let mut mut_k2 = kinematic2.write();
 
                 if let Some(hit) =
-                    collides::<KinematicBody, KinematicBody>(&mut_k1, &mut_k2, options)
+                    collides::<KinematicBody<B>, KinematicBody<B>>(&mut_k1, &mut_k2, options)
                 {
-                    mut_k1.add_contact(hit, Some(mut_k2.weight()), mut_k2.stored_payload().into());
+                    mut_k1.add_contact(hit, Some(mut_k2.weight()), mut_k2.payload().clone());
                     mut_k2.add_contact(
                         hit.swapped(),
                         Some(mut_k1.weight()),
-                        mut_k1.stored_payload().into(),
+                        mut_k1.payload().clone(),
                     );
                 }
             });
@@ -76,18 +79,18 @@ impl World {
             self.trigger_set
                 .partition
                 .for_each_overlaps(&aabb, |trigger| {
-                    let trigger = trigger.read();
-                    if intersects::<KinematicBody, TriggerArea>(&mut_kine, &trigger) {
+                    let mut trigger = trigger.write();
+                    if intersects::<KinematicBody<B>, TriggerArea<T, B>>(&mut_kine, &trigger) {
                         // the kinematic body intersect with this trigger area
                         // call the callback of the trigger on both
-                        trigger.on_overlap()(trigger.stored_payload().into(), &mut mut_kine)
+                        trigger.on_overlap(&mut mut_kine)
                     }
                 });
         }
     }
 }
 
-impl World {
+impl<B, T> World<T, B> {
     /// Perform a raycast with the static and/or kinematic bodies in this world
     pub fn raycast(
         &self,
@@ -96,32 +99,31 @@ impl World {
         mask: Mask,
         hit_statics: bool,
         hit_kinematics: bool,
-    ) -> Option<RayIntersection> {
+    ) -> RayResult<B> {
         // Define the AABB around the ray
         let aabb = Aabb::from_ray(ray, max_time_of_impact, mask);
 
         // Try to find the best candidate
-        let mut found: Option<RayIntersection> = None;
+        let mut found = RayResult::None;
         let mut time = Real::MAX;
-
-        // share common function between static bodies and kinematic bodies
-        let mut on_overlap = |shape: &dyn Shape, isometry: &Isometry<Real>| {
-            if let Some(hit) =
-                shape.cast_ray_and_get_normal(isometry, ray, max_time_of_impact, true)
-            {
-                // if the hit is closer to the origin, replace the previous result
-                if hit.time_of_impact < time {
-                    time = hit.time_of_impact;
-                    found = Some(hit);
-                }
-            }
-        };
 
         // Check static bodies
         if hit_statics {
             self.static_set.partition.for_each_overlaps(&aabb, |body| {
-                let body = body.read();
-                (on_overlap)(body.shape(), body.isometry());
+                let b = body.read();
+                if let Some(hit) =
+                    b.shape()
+                        .cast_ray_and_get_normal(b.isometry(), ray, max_time_of_impact, true)
+                {
+                    // if the hit is closer to the origin, replace the previous result
+                    if hit.time_of_impact < time {
+                        time = hit.time_of_impact;
+                        found = RayResult::Static {
+                            hit,
+                            object: body.clone(),
+                        };
+                    }
+                }
             });
         }
 
@@ -130,11 +132,49 @@ impl World {
             self.kinematic_set
                 .partition
                 .for_each_overlaps(&aabb, |body| {
-                    let body = body.read();
-                    (on_overlap)(body.shape(), body.isometry());
+                    let b = body.read();
+                    if let Some(hit) = b.shape().cast_ray_and_get_normal(
+                        b.isometry(),
+                        ray,
+                        max_time_of_impact,
+                        true,
+                    ) {
+                        // if the hit is closer to the origin, replace the previous result
+                        if hit.time_of_impact < time {
+                            time = hit.time_of_impact;
+                            found = RayResult::Kinematic {
+                                hit,
+                                object: body.clone(),
+                            };
+                        }
+                    }
                 });
         }
 
         found
     }
+}
+
+/// Return data relative to the object that have been hit by the raycast
+pub enum RayResult<P> {
+    /// No object has been hit
+    None,
+
+    /// The object hit is a static body
+    Static {
+        /// Ray intersection data
+        hit: RayIntersection,
+
+        /// Reference to the object
+        object: Shared<StaticBody<P>>,
+    },
+
+    /// The object hit is a kinematic body
+    Kinematic {
+        /// Ray intersection data
+        hit: RayIntersection,
+
+        /// Reference to the object
+        object: Shared<KinematicBody<P>>,
+    },
 }

@@ -9,14 +9,14 @@ pub mod static_body;
 /// Trigger area
 pub mod trigger_area;
 
-/// Arbitrary payload
-pub mod payload;
-
 /// Hit result between solid objects
 pub mod contact;
 
 use super::Mask;
-use crate::{object::payload::SharedPayload, world::aabb::Aabb};
+use crate::{
+    object::{kinematic_body::KinematicBody, static_body::StaticBody},
+    world::aabb::Aabb,
+};
 use alloc::sync::Arc;
 use bvh_arena::VolumeHandle;
 use parry::{
@@ -24,13 +24,14 @@ use parry::{
     query::{self, Contact, ShapeCastHit, ShapeCastOptions},
     shape::Shape,
 };
-use payload::OptPayload;
 
 /// Mask where all bits are set to 1
 const MASK_ALL: Mask = Mask::MAX;
 
 /// Trait implemented for static and dynamic bodies
 pub trait Object {
+    type Payload;
+
     /// Store the handle of this object after it has been added to the world
     fn set_handle(&mut self, handle: VolumeHandle);
 
@@ -50,13 +51,10 @@ pub trait Object {
     fn aabb(&self) -> Aabb;
 
     /// Access the payload defined on this object
-    fn stored_payload(&self) -> SharedPayload;
+    fn payload(&self) -> &Self::Payload;
 
-    /// Access the payload in a usable state
-    #[inline]
-    fn get_payload(&self) -> OptPayload {
-        self.stored_payload().get()
-    }
+    /// Access the payload defined on this object
+    fn payload_mut(&mut self) -> &mut Self::Payload;
 
     /// Get the layer(s) this body belongs to
     #[inline]
@@ -75,10 +73,22 @@ pub trait Object {
     fn velocity(&self) -> Vector<Real> {
         Vector::default()
     }
+
+    /// Try to cast the object into a kinematic body
+    #[inline]
+    fn as_kinematic(&self) -> Option<&KinematicBody<Self::Payload>> {
+        None
+    }
+
+    /// Try to cast the object into a static body
+    #[inline]
+    fn as_static(&self) -> Option<&StaticBody<Self::Payload>> {
+        None
+    }
 }
 
 /// Common data shared between static and dynamic bodies
-struct CommonData {
+struct CommonData<P> {
     /// Handle of this body in the world
     handle: Option<VolumeHandle>,
 
@@ -89,13 +99,13 @@ struct CommonData {
     isometry: Isometry<Real>,
 
     /// Arbitrary payload
-    payload: SharedPayload,
+    payload: P,
 }
 
-impl CommonData {
+impl<P> CommonData<P> {
     /// Create a new common data instance
     #[inline]
-    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, payload: SharedPayload) -> Self {
+    pub fn new(shape: Arc<dyn Shape>, isometry: Isometry<Real>, payload: P) -> Self {
         CommonData {
             handle: None,
             shape,
@@ -105,7 +115,9 @@ impl CommonData {
     }
 }
 
-impl Object for CommonData {
+impl<P> Object for CommonData<P> {
+    type Payload = P;
+
     /// Store the handle of this object after it has been added to the world
     #[inline]
     fn set_handle(&mut self, handle: VolumeHandle) {
@@ -144,8 +156,14 @@ impl Object for CommonData {
 
     /// Access the payload defined on this object
     #[inline]
-    fn stored_payload(&self) -> SharedPayload {
-        self.payload.clone()
+    fn payload(&self) -> &Self::Payload {
+        &self.payload
+    }
+
+    /// Access the payload defined on this object
+    #[inline]
+    fn payload_mut(&mut self) -> &mut Self::Payload {
+        &mut self.payload
     }
 }
 
