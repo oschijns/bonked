@@ -3,11 +3,12 @@ members = ["crates/bonked2d", "crates/bonked3d"]
 resolver = "2"
 
 [workspace.package]
-description = "A really simple physics engine intended for making games on embedded systems"
+description = "simple collision engine for retro console development"
 authors = ["Olivier Schyns <https://github.com/oschijns>"]
 repository = "https://github.com/oschijns/bonked"
-version = "0.0.5"
-edition = "2021"
+version = "0.0.1"
+edition = "2024"
+license = "MIT"
 
 [patch.crates-io]
 bonked2d = { path = "crates/bonked2d" }

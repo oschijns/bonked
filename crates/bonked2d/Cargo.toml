@@ -5,15 +5,12 @@ authors.workspace = true
 repository.workspace = true
 version.workspace = true
 edition.workspace = true
-#license.workspace = true
+license.workspace = true
 
 # Compile Features
 [features]
-default = ["required-features", "parry-f32", "mask-u32", "alloc"]
-#default = ["required-features", "parry-f32", "mask-u32", "std"]
-required-features = ["2d"]
+default = ["2d", "parry-f32", "mask-u32", "std"]
 2d = []
-3d = []
 mask-u32 = []
 mask-u64 = []
 
@@ -38,16 +35,11 @@ parry-f32 = ["dep:parry2d"]
 parry-f64 = ["dep:parry2d-f64"]
 
 
-# Ignore "3d" feature
-[lints.rust]
-#unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature = "3d")'] }
-
-
 # Library configuration
 [lib]
 name = "bonked2d"
-path = "../../src/lib.rs"
-
+#path = "../../src/lib.rs"
+required-features = ["2d"]
 
 # Dependencies
 [dependencies]

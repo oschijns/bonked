@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(unexpected_cfgs)]
 
 // cannot use 2D and 3D features at the same time
 #[cfg(all(feature = "2d", feature = "3d"))]
