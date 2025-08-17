@@ -19,6 +19,9 @@ pub mod object;
 /// Define the world
 pub mod world;
 
+/// Define collision masks, layers and filters
+pub mod mask;
+
 /// Use alloc crate for no_std support
 extern crate alloc;
 
@@ -36,15 +39,8 @@ pub extern crate parry3d as parry;
 #[cfg(all(feature = "3d", feature = "parry-f64"))]
 pub extern crate parry3d_f64 as parry;
 
-// pick the mask size based on feature flags
-
-#[cfg(feature = "mask-u32")]
-pub type Mask = u32;
-
-#[cfg(feature = "mask-u64")]
-pub type Mask = u64;
-
 use alloc::sync::Arc;
+use parry::math::{Real, Vector};
 use spin::RwLock;
 
 /// Shared reference with a read-write lock
@@ -54,3 +50,15 @@ pub type Shared<O> = Arc<RwLock<O>>;
 pub fn make_shared<O>(object: O) -> Shared<O> {
     Arc::new(RwLock::new(object))
 }
+
+/// Returns `true` if `v` is zero (up to an epsilon).
+#[inline]
+pub fn is_null(v: &Vector<Real>, epsilon: Real) -> bool {
+    v.norm_squared() <= epsilon * epsilon
+}
+
+#[cfg(feature = "2d")]
+pub const NULL_VECTOR: Vector<Real> = Vector::new(0.0, 0.0);
+
+#[cfg(feature = "3d")]
+pub const NULL_VECTOR: Vector<Real> = Vector::new(0.0, 0.0, 0.0);

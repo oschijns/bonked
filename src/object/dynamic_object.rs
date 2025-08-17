@@ -1,0 +1,150 @@
+//! Dynamic object
+
+use super::Object;
+use crate::{mask::LayerFilter, object::common_object::CommonObject};
+use alloc::sync::Arc;
+use delegate::delegate;
+use parry::{
+    bounding_volume::Aabb,
+    math::{Isometry, Real, Translation, Vector},
+    na::Unit,
+    shape::Shape,
+};
+
+/// Dynamic objects can move over time
+pub struct DynamicObject {
+    /// Shape, isometry
+    common: CommonObject,
+
+    /// Weight of this object, define how two objects can push against each other
+    weight: Real,
+
+    /// Specify if this object will bounce off other surfaces
+    bounce: bool,
+
+    /// Velocity of the object.
+    /// It can be accessed directly to modify each coordinate individually.
+    pub velocity: Vector<Real>,
+
+    /// Next position of the object
+    pub next_position: Vector<Real>,
+}
+
+impl DynamicObject {
+    /// Create a new dynamic object
+    pub fn new(
+        shape: Arc<dyn Shape>,
+        isometry: Isometry<Real>,
+        layer_filter: LayerFilter,
+        is_trigger: bool,
+        weight: Real,
+        bounce: bool,
+    ) -> Self {
+        Self {
+            common: CommonObject::new(shape, isometry, layer_filter, is_trigger),
+            weight,
+            bounce,
+            velocity: Vector::zeros(),
+            next_position: isometry.translation.vector,
+        }
+    }
+}
+
+impl Object for DynamicObject {
+    delegate! {
+        to self.common {
+            #[inline] fn shape(&self) -> &dyn Shape;
+            #[inline] fn isometry(&self) -> &Isometry<Real>;
+            #[inline] fn is_trigger_area(&self) -> bool;
+            #[inline] fn layer_filter(&self) -> &LayerFilter;
+        }
+    }
+
+    /// Compute the AABB of this moving body
+    #[inline]
+    fn aabb(&self) -> Aabb {
+        let next = Isometry::from_parts(
+            Translation::from(self.next_position),
+            self.common.isometry.rotation,
+        );
+        self.common
+            .shape
+            .compute_swept_aabb(&self.common.isometry, &next)
+    }
+
+    /// The object is dynamic
+    #[inline]
+    fn is_dynamic(&self) -> bool {
+        true
+    }
+
+    /// Get the velocity of the body (if it has one)
+    #[inline]
+    fn velocity(&self) -> Vector<Real> {
+        self.velocity
+    }
+
+    /// Try to cast the object into a dynamic object
+    #[inline]
+    fn as_dynamic(&self) -> Option<&Self> {
+        Some(self)
+    }
+}
+
+impl DynamicObject {
+    /// Compute the estimated next isometry by applying the velocity
+    pub fn pre_update(&mut self, delta_time: Real) {
+        // submit the computed new isometry
+        self.common.isometry.translation = Translation::from(self.next_position);
+
+        // Now move the estimated next isometry to
+        // its expected location based on the velocity.
+        self.next_position += self.velocity * delta_time;
+    }
+
+    /// Access the weight of the dynamic object
+    #[inline]
+    pub fn weight(&self) -> Real {
+        self.weight
+    }
+
+    /// Access the next isometry of the body
+    #[inline]
+    pub fn next_isometry(&self) -> Isometry<Real> {
+        Isometry::from_parts(
+            Translation::from(self.next_position),
+            self.common.isometry.rotation,
+        )
+    }
+
+    /// Apply a hit result to this body
+    pub(crate) fn apply_hit(
+        &mut self,
+        time_of_impact: Real,
+        others_normal: &Unit<Vector<Real>>,
+        others_weight: Option<Real>,
+    ) {
+        // get the normal of the surface of the other object
+        let normal = others_normal.into_inner();
+        let ratio = if let Some(weight) = others_weight {
+            1.0 - (self.weight / (self.weight + weight))
+        } else {
+            1.0
+        };
+
+        // Push back the dynamic body.
+        self.next_position -= normal * (time_of_impact * ratio);
+
+        // The dot product specify if the angle between the two vectors is accute or obtuse.
+        let dot = normal.dot(&self.velocity);
+        let push_back = normal * (dot * ratio);
+
+        if dot > 0.0 {
+            // angle is accute => cut off from the velocity
+            self.velocity -= push_back;
+        } else if self.bounce {
+            // angle is obtuse => add to the velocity
+            self.velocity += push_back;
+        }
+    }
+}

@@ -2,82 +2,95 @@
 //! Guarantee that the reference to the bodies are
 //! maintained as long as they are part of the physics world.
 
-use super::{aabb::Aabb, Shared};
 use crate::object::Object;
-use alloc::{sync::Arc, vec::Vec};
-use bvh_arena::Bvh;
+use core::cell::{Ref, RefCell, RefMut};
 use delegate::delegate;
-use spin::RwLock;
+use parry::{
+    bounding_volume::Aabb,
+    math::{Point, Real},
+    partitioning::{Bvh, BvhWorkspace},
+    query::{PointProjection, Ray},
+    utils::hashmap::HashMap,
+};
 
-/// Store a set of elements
+/// Identifier to find an object in the set
+pub type Id = u32;
+
+/// Set of physics objects
+#[derive(Default)]
 pub struct Set<O> {
-    /// List of objects in the set
-    pub(crate) objects: Vec<Shared<O>>,
+    /// Next ID to use for the next object
+    pub(crate) next_id: Id,
 
-    /// Partitionning of the objects in the set
-    pub(crate) partition: Bvh<Shared<O>, Aabb>,
-}
+    /// List of objects in this set
+    pub(crate) objects: HashMap<Id, RefCell<O>>,
 
-/// Generate a default set for this collection
-impl<O> Default for Set<O> {
-    fn default() -> Self {
-        Self {
-            objects: Default::default(),
-            partition: Default::default(),
-        }
-    }
+    /// Partitionning of the objects in the world
+    pub(crate) bvh: Bvh,
 }
 
 impl<O> Set<O> {
+    /// Create a new empty set
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            next_id: 0,
+            objects: HashMap::new(),
+            bvh: Bvh::new(),
+        }
+    }
+
     /// Create a new empty set with a predefined capacity
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            objects: Vec::with_capacity(capacity),
-            partition: Bvh::default(),
+            next_id: 0,
+            objects: HashMap::with_capacity(capacity),
+            bvh: Bvh::new(),
         }
     }
+}
 
-    // Expose some methods from the underlying vector
-    delegate! {
-        to self.objects {
-            pub fn len(&self) -> usize;
-            pub fn is_empty(&self) -> bool;
-            pub fn reserve(&mut self, additional: usize);
-            pub fn reserve_exact(&mut self, additional: usize);
-            pub fn shrink_to_fit(&mut self);
-            pub fn shrink_to(&mut self, min_capacity: usize);
-            pub fn iter(&self) -> impl Iterator<Item = &Arc<RwLock<O>>>;
-            pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Arc<RwLock<O>>>;
-        }
-    }
-
-    /// Store a new element in this set
-    pub fn store(&mut self, object: Shared<O>) {
-        self.objects.push(object);
-    }
-
-    /// Remove an element from this set but don't look into the partition
-    /// Prefer using `remove` instead.
-    pub fn quick_remove(&mut self, object: &Shared<O>) -> bool {
-        // find the position of the object in the list
-        for (index, value) in self.objects.iter().enumerate() {
-            if Arc::ptr_eq(object, value) {
-                // We found the index, create an handle and remove the object.
-                self.objects.swap_remove(index);
-
-                // once found, stop the iteration
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Reset the partition but don't update the objects' handles
-    /// Prefer using `repartition` instead.
+// Re-export some Bvh methods
+impl<O> Set<O> {
     #[inline]
-    pub fn quick_reset(&mut self) {
-        self.partition.clear();
+    pub fn intersect_aabb<'a>(&'a self, aabb: &'a Aabb) -> impl Iterator<Item = u32> + 'a {
+        self.bvh.intersect_aabb(aabb)
+    }
+
+    #[inline]
+    pub fn project_point(
+        &self,
+        point: &Point<Real>,
+        max_distance: Real,
+        primitive_check: impl Fn(Id, Real) -> Option<PointProjection>,
+    ) -> Option<(Id, (Real, PointProjection))> {
+        self.bvh.project_point(point, max_distance, primitive_check)
+    }
+
+    #[inline]
+    pub fn cast_ray(
+        &self,
+        ray: &Ray,
+        max_time_of_impact: Real,
+        primitive_check: impl Fn(Id, Real) -> Option<Real>,
+    ) -> Option<(Id, Real)> {
+        self.bvh.cast_ray(ray, max_time_of_impact, primitive_check)
+    }
+}
+
+impl<O> Set<O> {
+    delegate! {
+        to self.bvh {
+            #[inline] pub fn refit(&mut self, workspace: &mut BvhWorkspace);
+            #[inline] pub fn refit_without_opt(&mut self);
+            #[inline] pub fn root_aabb(&self) -> Aabb;
+            #[inline] pub fn subtree_depth(&self, node_id: Id) -> u32;
+            #[inline] pub fn leaf_count(&self) -> u32;
+            #[inline] pub fn assert_well_formed(&self);
+            #[inline] pub fn assert_well_formed_topology_only(&self);
+            #[inline] pub fn assert_is_depth_first(&self);
+        }
     }
 }
 
@@ -85,56 +98,58 @@ impl<O> Set<O>
 where
     O: Object,
 {
-    /// Store the element and add it to the partition too
-    pub fn add(&mut self, object: Shared<O>) {
-        // add the object to the list
-        self.objects.push(object.clone());
-
-        // lock the object with write access to add it to the partition
-        let mut mut_obj = object.write();
-        let handle = self.partition.insert(object.clone(), mut_obj.aabb());
-        mut_obj.set_handle(handle);
+    /// Get the object for the given ID
+    pub fn get(&self, id: Id) -> Option<Ref<'_, O>> {
+        if let Some(o) = self.objects.get(&id) {
+            Some(o.borrow())
+        } else {
+            None
+        }
     }
 
-    /// Remove an element from this set
-    pub fn clean_remove(&mut self, object: &Shared<O>) -> bool {
-        // find the position of the object in the list
-        for (index, value) in self.objects.iter().enumerate() {
-            if Arc::ptr_eq(object, value) {
-                // We found the index, create an handle and remove the object.
-                self.objects.swap_remove(index);
-
-                // detach the handle from the object
-                let mut mut_obj = object.write();
-                let handle = mut_obj.handle();
-                mut_obj.unset_handle();
-
-                // use the handle to remove the object from the partition
-                if let Some(handle) = handle {
-                    self.partition.remove(handle);
-                }
-
-                // once found, stop the iteration
-                return true;
-            }
+    /// Get the object for the given ID
+    pub fn get_mut(&mut self, id: Id) -> Option<RefMut<'_, O>> {
+        if let Some(o) = self.objects.get(&id) {
+            Some(o.borrow_mut())
+        } else {
+            None
         }
-        false
+    }
+
+    /// Add the object in the set, but this requires to call the refit method afterwards
+    pub fn quick_add(&mut self, object: RefCell<O>, margin: Real) -> Id {
+        let aabb = object.borrow().aabb();
+        unsafe {
+            self.objects.insert_unique_unchecked(self.next_id, object);
+        }
+        self.bvh
+            .insert_or_update_partially(aabb, self.next_id, margin);
+        self.next_id += 1;
+        self.next_id
+    }
+
+    /// Add the object in the set
+    pub fn clean_add(&mut self, object: RefCell<O>, margin: Real) -> Id {
+        let aabb = object.borrow().aabb();
+        unsafe {
+            self.objects.insert_unique_unchecked(self.next_id, object);
+        }
+        self.bvh
+            .insert_with_change_detection(aabb, self.next_id, margin);
+        self.next_id += 1;
+        self.next_id
+    }
+
+    /// Remove an object from this set
+    pub fn remove(&mut self, id: Id) -> bool {
+        if self.objects.remove(&id).is_some() {
+            self.bvh.remove(id);
+            true
+        } else {
+            false
+        }
     }
 
     /// Compute a partitionning for the objects defined in this set
-    pub fn repartition(&mut self) {
-        self.partition.clear();
-        for object in &self.objects {
-            let mut mut_obj = object.write();
-            let handle = self.partition.insert(object.clone(), mut_obj.aabb());
-            mut_obj.set_handle(handle);
-        }
-    }
-
-    /// Performs an overlap query between a provided AABB and this set.
-    /// This can be used to implement specific behaviors.
-    #[inline]
-    pub fn query(&self, aabb: &Aabb, on_overlap: impl FnMut(&Shared<O>)) {
-        self.partition.for_each_overlaps(aabb, on_overlap);
-    }
+    pub fn repartition(&mut self) {}
 }

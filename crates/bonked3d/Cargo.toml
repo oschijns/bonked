@@ -10,19 +10,13 @@ readme.workspace = true
 
 # Compile Features
 [features]
-default = ["3d", "parry-f32", "mask-u32", "std"]
+default = ["3d", "parry-f32", "mask-u32"] #, "std"]
 3d = []
 mask-u32 = []
 mask-u64 = []
 
 # enable support for the standard library
-std = [
-    "parry3d?/std",
-    "parry3d-f64?/std",
-    "nalgebra-glm/std",
-    "bvh-arena/std",
-    "spin/std",
-]
+std = ["parry3d?/std", "parry3d-f64?/std", "spin/std"]
 
 # enable support for alloc
 alloc = ["parry3d?/alloc", "parry3d-f64?/alloc"]
@@ -46,32 +40,22 @@ required-features = ["3d"]
 # Dependencies
 [dependencies]
 
-# Mutable access to shared references
-spin = "0.10"
-
-# Broadphase
-bvh-arena = { version = "1.1", default-features = false }
+delegate.workspace = true
+spin.workspace = true
 
 # Collision Detection
-parry3d = { version = "0.19", features = [
+parry3d = { version = "0.23", features = [
     "required-features",
     "alloc",
 ], default-features = false, optional = true }
-parry3d-f64 = { version = "0.19", features = [
+parry3d-f64 = { version = "0.23", features = [
     "required-features",
     "alloc",
 ], default-features = false, optional = true }
 
-# Geometry operations
-nalgebra-glm = { version = "0.19", default-features = false }
-
-# Delegate methods from internal fields
-delegate = "0.13"
 
 # Dependencies for examples
 [dev-dependencies]
 
 # Quick rendering
 macroquad = "0.4"
-
-rapier3d = "0.26"

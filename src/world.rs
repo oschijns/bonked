@@ -1,134 +1,88 @@
 //! Define a physics world containing fixed and kinematic bodies
 
-/// Base operations available on a world
-mod base;
-
 /// Collection of objects
 pub mod set;
 
-/// Axis-Aligned Bounding Box (AABB)
-pub mod aabb;
+/// Handle world state update
+mod update;
 
 use crate::{
-    object::{kinematic_body::KinematicBody, static_body::StaticBody, trigger_area::TriggerArea},
-    Shared,
+    object::{DynamicObject, StaticObject},
+    world::set::Id,
 };
-use parry::math::Real;
+use alloc::vec::Vec;
+use parry::{math::Real, partitioning::BvhWorkspace, query::ShapeCastHit};
 use set::Set;
 
 /// Define a physics world
-#[derive(Default)]
-pub struct World<T = (), B = ()> {
-    /// Store the list of kinematic bodies
-    kinematic_set: Set<KinematicBody<B>>,
-
+pub struct World {
     /// Store the list of static bodies
-    static_set: Set<StaticBody<B>>,
+    statics: Set<StaticObject>,
 
-    /// Store the list of trigger areas
-    trigger_set: Set<TriggerArea<T, B>>,
+    /// Store the list of dynamic objects
+    dynamics: Set<DynamicObject>,
+
+    /// Allocate a workspace for broadphase processing
+    workspace: BvhWorkspace,
+
+    /// Intersection between a dynamic body and a trigger area
+    on_trigger: Vec<OnContact>,
+
+    /// Collision result between two physics bodies
+    on_collision: Vec<OnContact<ShapeCastHit>>,
 
     /// Epsilon value
     epsilon: Real,
 }
 
-impl<B, T> World<T, B> {
+impl World {
     /// Create a new world
     pub fn new(epsilon: Real) -> Self {
         Self {
-            kinematic_set: Set::default(),
-            static_set: Set::default(),
-            trigger_set: Set::default(),
+            statics: Set::new(),
+            dynamics: Set::new(),
+            workspace: BvhWorkspace::default(),
+            on_trigger: Vec::new(),
+            on_collision: Vec::new(),
             epsilon,
         }
     }
 
     /// Create a new empty world with a predefined capacity
-    pub fn with_capacity(
-        epsilon: Real,
-        cap_kinematic: usize,
-        cap_static: usize,
-        cap_trigger: usize,
-    ) -> Self {
+    pub fn with_capacity(epsilon: Real, cap_static: usize, cap_dynamic: usize) -> Self {
         Self {
-            kinematic_set: Set::with_capacity(cap_kinematic),
-            static_set: Set::with_capacity(cap_static),
-            trigger_set: Set::with_capacity(cap_trigger),
+            statics: Set::with_capacity(cap_static),
+            dynamics: Set::with_capacity(cap_dynamic),
+            workspace: BvhWorkspace::default(),
+            on_trigger: Vec::with_capacity(cap_dynamic),
+            on_collision: Vec::with_capacity(cap_dynamic),
             epsilon,
         }
     }
 }
 
-impl<B, T> World<T, B> {
-    /// Add a kinematic body to the world
-    #[inline]
-    pub fn add_kinematic(&mut self, body: Shared<KinematicBody<B>>) {
-        self.kinematic_set.store(body); // don't update the partition here
-    }
+#[derive(Debug, Clone, Copy)]
+struct OnContact<D = ()> {
+    /// Identifier of the first object (necessarily dynamic)
+    id1: Id,
 
-    /// Add a static body to the world
-    #[inline]
-    pub fn add_static(&mut self, body: Shared<StaticBody<B>>) {
-        self.static_set.add(body);
-    }
+    /// Identifier of the second object (can be either static or dynamic)
+    id2: Id,
 
-    /// Add a trigger area to the world
-    #[inline]
-    pub fn add_trigger(&mut self, area: Shared<TriggerArea<T, B>>) {
-        self.trigger_set.add(area);
-    }
+    /// Is the second object dynamic or static
+    dynamic2: bool,
+
+    /// Extra data (ShapeCastHit)
+    data: D,
 }
 
-impl<B, T> World<T, B> {
-    /// Remove a kinematic body from the world
-    #[inline]
-    pub fn remove_kinematic(&mut self, body: &Shared<KinematicBody<B>>) {
-        self.kinematic_set.quick_remove(body);
-    }
-
-    /// Remove a static body from the world
-    #[inline]
-    pub fn remove_static(&mut self, body: &Shared<StaticBody<B>>) {
-        self.static_set.clean_remove(body);
-    }
-
-    /// Remove a trigger area from the world
-    #[inline]
-    pub fn remove_trigger(&mut self, area: &Shared<TriggerArea<T, B>>) {
-        self.trigger_set.clean_remove(area);
-    }
-}
-
-impl<B, T> World<T, B> {
-    /// Access the set of kinematic bodies
-    pub fn kinematics(&self) -> &Set<KinematicBody<B>> {
-        &self.kinematic_set
-    }
-
-    /// Access the set of static bodies
-    pub fn statics(&self) -> &Set<StaticBody<B>> {
-        &self.static_set
-    }
-
-    /// Access the set of trigger areas
-    pub fn triggers(&self) -> &Set<TriggerArea<T, B>> {
-        &self.trigger_set
-    }
-}
-
-impl<B, T> World<T, B> {
-    /// Mutable access the set of kinematic bodies
-    pub fn kinematics_mut(&mut self) -> &mut Set<KinematicBody<B>> {
-        &mut self.kinematic_set
-    }
-
-    /// Mutable access the set of static bodies
-    pub fn statics_mut(&mut self) -> &mut Set<StaticBody<B>> {
-        &mut self.static_set
-    }
-
-    /// Mutable access the set of trigger areas
-    pub fn triggers_mut(&mut self) -> &mut Set<TriggerArea<T, B>> {
-        &mut self.trigger_set
+impl<D> OnContact<D> {
+    pub fn new(id1: Id, id2: Id, dynamic2: bool, data: D) -> Self {
+        Self {
+            id1,
+            id2,
+            dynamic2,
+            data,
+        }
     }
 }

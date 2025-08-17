@@ -10,19 +10,13 @@ readme.workspace = true
 
 # Compile Features
 [features]
-default = ["2d", "parry-f32", "mask-u32", "std"]
+default = ["2d", "parry-f32", "mask-u32"] #, "std"]
 2d = []
 mask-u32 = []
 mask-u64 = []
 
 # enable support for the standard library
-std = [
-    "parry2d?/std",
-    "parry2d-f64?/std",
-    "nalgebra-glm/std",
-    "bvh-arena/std",
-    "spin/std",
-]
+std = ["parry2d?/std", "parry2d-f64?/std", "spin/std"]
 
 # enable support for alloc
 alloc = ["parry2d?/alloc", "parry2d-f64?/alloc"]
@@ -45,27 +39,19 @@ required-features = ["2d"]
 # Dependencies
 [dependencies]
 
-# Mutable access to shared references
-spin = "0.10"
-
-# Broadphase
-bvh-arena = { version = "1.1", default-features = false }
+delegate.workspace = true
+spin.workspace = true
 
 # Collision Detection
-parry2d = { version = "0.19", features = [
+parry2d = { version = "0.23", features = [
     "required-features",
     "alloc",
 ], default-features = false, optional = true }
-parry2d-f64 = { version = "0.19", features = [
+parry2d-f64 = { version = "0.23", features = [
     "required-features",
     "alloc",
 ], default-features = false, optional = true }
 
-# Geometry operations
-nalgebra-glm = { version = "0.19", default-features = false }
-
-# Delegate methods from internal fields
-delegate = "0.13"
 
 # Dependencies for examples
 [dev-dependencies]

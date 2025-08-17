@@ -1,28 +1,29 @@
 //! Contact between two solid objects
 
+use crate::world::set::Id;
 use core::cmp::Ordering;
 use parry::{math::Real, query::ShapeCastHit};
 
 /// Contact data
-pub struct Contact<P = ()> {
+pub struct Contact {
     /// parry's shape cast hit
     hit: ShapeCastHit,
 
     /// Weight ratio between the two objects in contact
     weight_ratio: Real,
 
-    /// Payload of the other object
-    payload: P,
+    /// Id of the other object
+    other_id: Id,
 }
 
-impl<P> Contact<P> {
+impl Contact {
     /// Create a new contact result
     #[inline]
-    pub fn new(hit: ShapeCastHit, weight_ratio: Real, payload: P) -> Self {
+    pub fn new(hit: ShapeCastHit, weight_ratio: Real, other_id: Id) -> Self {
         Self {
             hit,
             weight_ratio,
-            payload,
+            other_id,
         }
     }
 
@@ -40,15 +41,8 @@ impl<P> Contact<P> {
 
     /// Get the payload data of the other object
     #[inline]
-    pub fn payload(&self) -> &P {
-        &self.payload
-    }
-
-    /// Get the payload data of the other object as mutable. This makes sense
-    /// if the payload is a pointer to the data stored on the actual object.
-    #[inline]
-    pub fn payload_mut(&mut self) -> &mut P {
-        &mut self.payload
+    pub fn other_id(&self) -> Id {
+        self.other_id
     }
 
     /// Compare two contact results to order them from nearest to furtherest
