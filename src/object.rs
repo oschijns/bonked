@@ -9,9 +9,6 @@ mod static_object;
 /// Dynamic objects
 mod dynamic_object;
 
-/// Hit result between solid objects
-mod contact;
-
 use crate::mask::LayerFilter;
 use parry::{
     bounding_volume::Aabb,

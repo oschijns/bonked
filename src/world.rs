@@ -3,16 +3,16 @@
 /// Collection of objects
 pub mod set;
 
+/// Iterators for physics events
+pub mod iter;
+
 /// Handle world state update
 mod update;
 
-use crate::{
-    object::{DynamicObject, StaticObject},
-    world::set::Id,
-};
+use crate::object::{DynamicObject, StaticObject};
 use alloc::vec::Vec;
 use parry::{math::Real, partitioning::BvhWorkspace, query::ShapeCastHit};
-use set::Set;
+use set::{Id, Set};
 
 /// Define a physics world
 pub struct World {
@@ -33,6 +33,21 @@ pub struct World {
 
     /// Epsilon value
     epsilon: Real,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct OnContact<D = ()> {
+    /// Identifier of the first object (necessarily dynamic)
+    id1: Id,
+
+    /// Identifier of the second object (can be either static or dynamic)
+    id2: Id,
+
+    /// Is the second object dynamic or static
+    dynamic2: bool,
+
+    /// Extra data (ShapeCastHit)
+    data: D,
 }
 
 impl World {
@@ -59,21 +74,6 @@ impl World {
             epsilon,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct OnContact<D = ()> {
-    /// Identifier of the first object (necessarily dynamic)
-    id1: Id,
-
-    /// Identifier of the second object (can be either static or dynamic)
-    id2: Id,
-
-    /// Is the second object dynamic or static
-    dynamic2: bool,
-
-    /// Extra data (ShapeCastHit)
-    data: D,
 }
 
 impl<D> OnContact<D> {

@@ -39,17 +39,7 @@ pub extern crate parry3d as parry;
 #[cfg(all(feature = "3d", feature = "parry-f64"))]
 pub extern crate parry3d_f64 as parry;
 
-use alloc::sync::Arc;
 use parry::math::{Real, Vector};
-use spin::RwLock;
-
-/// Shared reference with a read-write lock
-pub type Shared<O> = Arc<RwLock<O>>;
-
-/// Create a shared reference with a read-write lock
-pub fn make_shared<O>(object: O) -> Shared<O> {
-    Arc::new(RwLock::new(object))
-}
 
 /// Returns `true` if `v` is zero (up to an epsilon).
 #[inline]

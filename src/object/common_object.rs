@@ -1,7 +1,6 @@
 //! Data encountered in all objects
 
-use super::Object;
-use crate::{mask::Mask, object::LayerFilter};
+use super::{LayerFilter, Object};
 use alloc::sync::Arc;
 use parry::{
     bounding_volume::Aabb,
