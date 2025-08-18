@@ -1,7 +1,10 @@
 //! Static object
 
 use super::Object;
-use crate::{mask::LayerFilter, object::common_object::CommonObject};
+use crate::{
+    mask::{LayerFilter, Mask},
+    object::common_object::CommonObject,
+};
 use alloc::sync::Arc;
 use delegate::delegate;
 use parry::{
@@ -41,6 +44,12 @@ impl Object for StaticObject {
             #[inline] fn is_trigger_area(&self) -> bool;
             #[inline] fn layer_filter(&self) -> &LayerFilter;
         }
+    }
+
+    /// Return true if this object pass the given filter
+    #[inline]
+    fn pass_filter(&self, filter: Mask) -> bool {
+        (self.common.layer_filter.layer & filter) != 0
     }
 
     /// Try to cast the object into a static body

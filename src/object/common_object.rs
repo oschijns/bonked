@@ -1,5 +1,7 @@
 //! Data encountered in all objects
 
+use crate::mask::Mask;
+
 use super::{LayerFilter, Object};
 use alloc::sync::Arc;
 use parry::{
@@ -73,5 +75,11 @@ impl Object for CommonObject {
     #[inline]
     fn layer_filter(&self) -> &LayerFilter {
         &self.layer_filter
+    }
+
+    /// Return true if this object pass the given filter
+    #[inline]
+    fn pass_filter(&self, filter: Mask) -> bool {
+        (self.layer_filter.layer & filter) != 0
     }
 }

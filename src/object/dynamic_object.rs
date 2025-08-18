@@ -1,7 +1,10 @@
 //! Dynamic object
 
 use super::Object;
-use crate::{mask::LayerFilter, object::common_object::CommonObject};
+use crate::{
+    mask::{LayerFilter, Mask},
+    object::common_object::CommonObject,
+};
 use alloc::sync::Arc;
 use delegate::delegate;
 use parry::{
@@ -70,6 +73,12 @@ impl Object for DynamicObject {
         self.common
             .shape
             .compute_swept_aabb(&self.common.isometry, &next)
+    }
+
+    /// Return true if this object pass the given filter
+    #[inline]
+    fn pass_filter(&self, filter: Mask) -> bool {
+        (self.common.layer_filter.layer & filter) != 0
     }
 
     /// The object is dynamic

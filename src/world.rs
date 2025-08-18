@@ -9,9 +9,12 @@ pub mod iter;
 /// Handle world state update
 mod update;
 
+/// Allow making various geometry casts
+mod cast;
+
 use crate::object::{DynamicObject, StaticObject};
 use alloc::vec::Vec;
-use parry::{math::Real, partitioning::BvhWorkspace, query::ShapeCastHit};
+use parry::{partitioning::BvhWorkspace, query::ShapeCastHit};
 use set::{Id, Set};
 
 /// Define a physics world
@@ -30,9 +33,6 @@ pub struct World {
 
     /// Collision result between two physics bodies
     on_collision: Vec<OnContact<ShapeCastHit>>,
-
-    /// Epsilon value
-    epsilon: Real,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -52,27 +52,49 @@ struct OnContact<D = ()> {
 
 impl World {
     /// Create a new world
-    pub fn new(epsilon: Real) -> Self {
+    pub fn new() -> Self {
         Self {
             statics: Set::new(),
             dynamics: Set::new(),
             workspace: BvhWorkspace::default(),
             on_trigger: Vec::new(),
             on_collision: Vec::new(),
-            epsilon,
         }
     }
 
     /// Create a new empty world with a predefined capacity
-    pub fn with_capacity(epsilon: Real, cap_static: usize, cap_dynamic: usize) -> Self {
+    pub fn with_capacity(cap_static: usize, cap_dynamic: usize) -> Self {
         Self {
             statics: Set::with_capacity(cap_static),
             dynamics: Set::with_capacity(cap_dynamic),
             workspace: BvhWorkspace::default(),
             on_trigger: Vec::with_capacity(cap_dynamic),
             on_collision: Vec::with_capacity(cap_dynamic),
-            epsilon,
         }
+    }
+
+    /// Access the set of static objects
+    #[inline]
+    pub fn statics(&self) -> &Set<StaticObject> {
+        &self.statics
+    }
+
+    /// Access the set of static objects mutably
+    #[inline]
+    pub fn statics_mut(&mut self) -> &mut Set<StaticObject> {
+        &mut self.statics
+    }
+
+    /// Access the set of dynamic objects
+    #[inline]
+    pub fn dynamics(&self) -> &Set<DynamicObject> {
+        &self.dynamics
+    }
+
+    /// Access the set of dynamic objects mutably
+    #[inline]
+    pub fn dynamics_mut(&mut self) -> &mut Set<DynamicObject> {
+        &mut self.dynamics
     }
 }
 

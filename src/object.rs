@@ -9,7 +9,7 @@ mod static_object;
 /// Dynamic objects
 mod dynamic_object;
 
-use crate::mask::LayerFilter;
+use crate::mask::{LayerFilter, Mask};
 use parry::{
     bounding_volume::Aabb,
     math::{Isometry, Real, Vector},
@@ -38,8 +38,20 @@ pub trait Object {
     /// Return true if the object is a trigger area
     fn is_trigger_area(&self) -> bool;
 
-    /// Get the layer(s) this body belongs to
+    /// Access the layer and filter of this object
     fn layer_filter(&self) -> &LayerFilter;
+
+    /// Return true if the two objects can interact if their layer and filter match
+    #[inline]
+    fn can_interact(&self, other: &Self) -> bool {
+        self.layer_filter().can_interact(*other.layer_filter())
+    }
+
+    /// Return true if this object pass the given filter
+    #[inline]
+    fn pass_filter(&self, filter: Mask) -> bool {
+        (self.layer_filter().layer & filter) != 0
+    }
 
     /// Get the velocity of the body (if it has one)
     #[inline]
