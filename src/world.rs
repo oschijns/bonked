@@ -15,9 +15,10 @@ mod cast;
 use crate::object::{DynamicObject, StaticObject};
 use alloc::vec::Vec;
 use parry::{partitioning::BvhWorkspace, query::ShapeCastHit};
-use set::{Id, Set};
+use set::{Index, Set};
 
 /// Define a physics world
+#[derive(Default)]
 pub struct World {
     /// Store the list of static bodies
     statics: Set<StaticObject>,
@@ -35,16 +36,23 @@ pub struct World {
     on_collision: Vec<OnContact<ShapeCastHit>>,
 }
 
+/// Result of a RayCast call
 #[derive(Debug, Clone, Copy)]
+pub struct Ident {
+    /// Identifier of the object in its own set
+    pub index: Index,
+
+    /// Specify if it is either a static or a dynamic object
+    pub is_dynamic: bool,
+}
+
+/// Store data for either trigger events or collision events
 struct OnContact<D = ()> {
     /// Identifier of the first object (necessarily dynamic)
-    id1: Id,
+    index1: Index,
 
     /// Identifier of the second object (can be either static or dynamic)
-    id2: Id,
-
-    /// Is the second object dynamic or static
-    dynamic2: bool,
+    ident2: Ident,
 
     /// Extra data (ShapeCastHit)
     data: D,
@@ -98,12 +106,21 @@ impl World {
     }
 }
 
+impl Ident {
+    /// Create a new identifier for an object the the world
+    #[inline]
+    pub fn new(index: Index, is_dynamic: bool) -> Self {
+        Self { index, is_dynamic }
+    }
+}
+
 impl<D> OnContact<D> {
-    pub fn new(id1: Id, id2: Id, dynamic2: bool, data: D) -> Self {
+    /// Create a new on contact event
+    #[inline]
+    pub fn new(index1: Index, ident2: Ident, data: D) -> Self {
         Self {
-            id1,
-            id2,
-            dynamic2,
+            index1,
+            ident2,
             data,
         }
     }

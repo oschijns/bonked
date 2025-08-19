@@ -14,19 +14,28 @@ use parry::{
 };
 
 /// Identifier to find an object in the set
-pub type Id = u32;
+pub type Index = u32;
 
 /// Set of physics objects
-#[derive(Default)]
 pub struct Set<O> {
-    /// Next ID to use for the next object
-    pub(crate) next_id: Id,
+    /// Next index to use for the next object
+    pub(crate) next_index: Index,
 
     /// List of objects in this set
-    pub(crate) objects: HashMap<Id, RefCell<O>>,
+    pub(crate) objects: HashMap<Index, RefCell<O>>,
 
     /// Partitionning of the objects in the world
     pub(crate) bvh: Bvh,
+}
+
+impl<O> Default for Set<O> {
+    fn default() -> Self {
+        Self {
+            next_index: 0,
+            objects: HashMap::default(),
+            bvh: Bvh::default(),
+        }
+    }
 }
 
 impl<O> Set<O> {
@@ -34,7 +43,7 @@ impl<O> Set<O> {
     #[inline]
     pub fn new() -> Self {
         Self {
-            next_id: 0,
+            next_index: 0,
             objects: HashMap::new(),
             bvh: Bvh::new(),
         }
@@ -44,7 +53,7 @@ impl<O> Set<O> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            next_id: 0,
+            next_index: 0,
             objects: HashMap::with_capacity(capacity),
             bvh: Bvh::new(),
         }
@@ -63,8 +72,8 @@ impl<O> Set<O> {
         &self,
         point: &Point<Real>,
         max_distance: Real,
-        primitive_check: impl Fn(Id, Real) -> Option<PointProjection>,
-    ) -> Option<(Id, (Real, PointProjection))> {
+        primitive_check: impl Fn(Index, Real) -> Option<PointProjection>,
+    ) -> Option<(Index, (Real, PointProjection))> {
         self.bvh.project_point(point, max_distance, primitive_check)
     }
 
@@ -73,8 +82,8 @@ impl<O> Set<O> {
         &self,
         ray: &Ray,
         max_time_of_impact: Real,
-        primitive_check: impl Fn(Id, Real) -> Option<Real>,
-    ) -> Option<(Id, Real)> {
+        primitive_check: impl Fn(Index, Real) -> Option<Real>,
+    ) -> Option<(Index, Real)> {
         self.bvh.cast_ray(ray, max_time_of_impact, primitive_check)
     }
 }
@@ -85,7 +94,7 @@ impl<O> Set<O> {
             #[inline] pub fn refit(&mut self, workspace: &mut BvhWorkspace);
             #[inline] pub fn refit_without_opt(&mut self);
             #[inline] pub fn root_aabb(&self) -> Aabb;
-            #[inline] pub fn subtree_depth(&self, node_id: Id) -> u32;
+            #[inline] pub fn subtree_depth(&self, node_index: Index) -> u32;
             #[inline] pub fn leaf_count(&self) -> u32;
             #[inline] pub fn assert_well_formed(&self);
             #[inline] pub fn assert_well_formed_topology_only(&self);
@@ -98,18 +107,18 @@ impl<O> Set<O>
 where
     O: Object,
 {
-    /// Get the object for the given ID
-    pub fn get(&self, id: Id) -> Option<Ref<'_, O>> {
-        if let Some(o) = self.objects.get(&id) {
+    /// Get the object for the given index
+    pub fn get(&self, index: Index) -> Option<Ref<'_, O>> {
+        if let Some(o) = self.objects.get(&index) {
             Some(o.borrow())
         } else {
             None
         }
     }
 
-    /// Get the object for the given ID
-    pub fn get_mut(&mut self, id: Id) -> Option<RefMut<'_, O>> {
-        if let Some(o) = self.objects.get(&id) {
+    /// Get the object for the given index
+    pub fn get_mut(&mut self, index: Index) -> Option<RefMut<'_, O>> {
+        if let Some(o) = self.objects.get(&index) {
             Some(o.borrow_mut())
         } else {
             None
@@ -117,33 +126,35 @@ where
     }
 
     /// Add the object in the set, but this requires to call the refit method afterwards
-    pub fn quick_add(&mut self, object: RefCell<O>, margin: Real) -> Id {
+    pub fn quick_add(&mut self, object: RefCell<O>, margin: Real) -> Index {
         let aabb = object.borrow().aabb();
         unsafe {
-            self.objects.insert_unique_unchecked(self.next_id, object);
+            self.objects
+                .insert_unique_unchecked(self.next_index, object);
         }
         self.bvh
-            .insert_or_update_partially(aabb, self.next_id, margin);
-        self.next_id += 1;
-        self.next_id
+            .insert_or_update_partially(aabb, self.next_index, margin);
+        self.next_index += 1;
+        self.next_index
     }
 
     /// Add the object in the set
-    pub fn clean_add(&mut self, object: RefCell<O>, margin: Real) -> Id {
+    pub fn clean_add(&mut self, object: RefCell<O>, margin: Real) -> Index {
         let aabb = object.borrow().aabb();
         unsafe {
-            self.objects.insert_unique_unchecked(self.next_id, object);
+            self.objects
+                .insert_unique_unchecked(self.next_index, object);
         }
         self.bvh
-            .insert_with_change_detection(aabb, self.next_id, margin);
-        self.next_id += 1;
-        self.next_id
+            .insert_with_change_detection(aabb, self.next_index, margin);
+        self.next_index += 1;
+        self.next_index
     }
 
     /// Remove an object from this set
-    pub fn remove(&mut self, id: Id) -> bool {
-        if self.objects.remove(&id).is_some() {
-            self.bvh.remove(id);
+    pub fn remove(&mut self, index: Index) -> bool {
+        if self.objects.remove(&index).is_some() {
+            self.bvh.remove(index);
             true
         } else {
             false

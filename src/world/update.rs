@@ -1,7 +1,7 @@
 //! Update the state of the world every frame
 
 use super::{OnContact, World};
-use crate::{NULL_VECTOR, object::Object};
+use crate::{NULL_VECTOR, object::Object, world::Ident};
 use parry::query::{self, ShapeCastOptions};
 
 impl World {
@@ -19,10 +19,10 @@ impl World {
             });
 
         // For each pair of leaves.
-        for (d_id, s_id) in leaf_pairs {
+        for (d_idx, s_idx) in leaf_pairs {
             // If the BVH trees contains IDs not bound to objects, this will panic!
-            let mut d_obj = self.dynamics.objects.get(&d_id).unwrap().borrow_mut();
-            let s_obj = self.statics.get(s_id).unwrap();
+            let mut d_obj = self.dynamics.objects.get(&d_idx).unwrap().borrow_mut();
+            let s_obj = self.statics.get(s_idx).unwrap();
 
             // Check that the dynamic object is not a trigger.
             // Trigger areas wherever they are dynamic or static should only detect dynamic bodies.
@@ -39,7 +39,8 @@ impl World {
                     )
                     .unwrap_or(false)
                     {
-                        self.on_trigger.push(OnContact::new(d_id, s_id, false, ()));
+                        self.on_trigger
+                            .push(OnContact::new(d_idx, Ident::new(s_idx, false), ()));
                     }
                 } else if let Some(hit) = query::cast_shapes(
                     d_obj.isometry(),
@@ -58,7 +59,7 @@ impl World {
 
                     // Store the result for later use
                     self.on_collision
-                        .push(OnContact::new(d_id, s_id, false, hit));
+                        .push(OnContact::new(d_idx, Ident::new(s_idx, false), hit));
                 }
             }
         }
@@ -84,7 +85,8 @@ impl World {
                         )
                         .unwrap_or(false)
                         {
-                            self.on_trigger.push(OnContact::new(id1, id2, true, ()));
+                            self.on_trigger
+                                .push(OnContact::new(id1, Ident::new(id2, true), ()));
                         }
                     } else if let Some(hit) = query::cast_shapes(
                         obj1.isometry(),
@@ -105,7 +107,8 @@ impl World {
                         obj2.apply_hit(hit.time_of_impact, &nrm1, Some(obj1.weight()));
 
                         // Store the result for later use
-                        self.on_collision.push(OnContact::new(id1, id2, true, hit));
+                        self.on_collision
+                            .push(OnContact::new(id1, Ident::new(id2, true), hit));
                     }
                 }
             },

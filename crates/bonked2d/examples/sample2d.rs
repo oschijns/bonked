@@ -1,14 +1,8 @@
-use bonked2d::{
-    make_shared,
-    object::{
-        kinematic_body::KinematicBody, static_body::StaticBody, trigger_area::TriggerArea, Object,
-    },
-    world::World,
-    Mask,
-};
+use bonked2d::world::World;
 use macroquad::{miniquad::window, prelude::*};
 use parry2d::{
     math::{Isometry, Point, Real, Vector},
+    query::ShapeCastOptions,
     shape::{Ball, Capsule, Cuboid, Shape},
 };
 use std::sync::Arc;
@@ -43,19 +37,13 @@ async fn main() {
             };
         }
 
-        for body in world.statics().iter() {
-            draw!(body, BLUE);
-        }
-
-        for body in world.kinematics().iter() {
-            draw!(body, RED);
-        }
-
-        for body in world.triggers().iter() {
-            draw!(body, GREEN);
-        }
-
-        world.update(delta);
+        const EPSILON: Real = 0.0001;
+        world.update(ShapeCastOptions {
+            max_time_of_impact: delta,
+            target_distance: EPSILON,
+            stop_at_penetration: true,
+            compute_impact_geometry_on_penetration: false,
+        });
 
         // quit the example
         if is_quit_requested() {
@@ -116,45 +104,8 @@ impl<'s> AShape<'s> {
     }
 }
 
-fn build_world() -> World<bool> {
-    const EPSILON: Real = 0.0001;
-    let mut world = World::with_capacity(EPSILON, 2, 1, 1);
-
-    world.add_static({
-        let (shape, isometry) = new_box([0.0, -0.5], [20.0, 1.0]);
-        make_shared(StaticBody::new(shape, isometry, (), Mask::MAX))
-    });
-
-    world.add_kinematic({
-        let (shape, isometry) = new_capsule([0.0, 10.0], 1.0, 2.0);
-        let mut body = KinematicBody::new(shape, isometry, (), Mask::MAX, Mask::MAX, 1.0, false);
-        body.velocity.y = -1.0;
-        make_shared(body)
-    });
-
-    world.add_kinematic({
-        let (shape, isometry) = new_capsule([0.5, 15.0], 1.0, 2.0);
-        let mut body = KinematicBody::new(shape, isometry, (), Mask::MAX, Mask::MAX, 1.0, false);
-        body.velocity.y = -1.5;
-        make_shared(body)
-    });
-
-    world.add_trigger({
-        let (shape, isometry) = new_box([5.0, 2.5], [5.0, 5.0]);
-        make_shared(TriggerArea::new(
-            shape,
-            isometry,
-            false,
-            Mask::MAX,
-            |trigger: &mut TriggerArea<bool>, _| {
-                let flag = trigger.payload_mut();
-                if !*flag {
-                    *flag = true;
-                    println!("Object entered area");
-                }
-            },
-        ))
-    });
+fn build_world() -> World {
+    let mut world = World::new();
 
     world
 }
