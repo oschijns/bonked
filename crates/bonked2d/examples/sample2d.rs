@@ -1,11 +1,18 @@
-use bonked2d::world::World;
+use bonked2d::{
+    mask::MASK_ALL,
+    object::{DynamicObject, Object, StaticObject},
+    world::World,
+};
 use macroquad::{miniquad::window, prelude::*};
 use parry2d::{
     math::{Isometry, Point, Real, Vector},
     query::ShapeCastOptions,
     shape::{Ball, Capsule, Cuboid, Shape},
 };
-use std::sync::Arc;
+use std::{
+    cell::{Ref, RefCell},
+    sync::Arc,
+};
 
 #[macroquad::main("2D")]
 async fn main() {
@@ -28,15 +35,6 @@ async fn main() {
             ..Default::default()
         });
 
-        macro_rules! draw {
-            ($body:ident, $color:ident) => {
-                let body = $body.read();
-                let shape = AShape::new(body.shape());
-                let pos = to_glam(body.isometry().translation.vector);
-                shape.draw(pos, $color);
-            };
-        }
-
         const EPSILON: Real = 0.0001;
         world.update(ShapeCastOptions {
             max_time_of_impact: delta,
@@ -44,6 +42,20 @@ async fn main() {
             stop_at_penetration: true,
             compute_impact_geometry_on_penetration: false,
         });
+
+        fn draw(obj: Ref<'_, dyn Object>, color: Color) {
+            let shape = AShape::new(obj.shape());
+            let pos = to_glam(obj.isometry().translation.vector);
+            shape.draw(pos, color);
+        }
+
+        for (_idx, obj) in world.statics().iter() {
+            draw(obj.borrow(), BLUE);
+        }
+
+        for (_idx, obj) in world.dynamics().iter() {
+            draw(obj.borrow(), RED);
+        }
 
         // quit the example
         if is_quit_requested() {
@@ -105,7 +117,23 @@ impl<'s> AShape<'s> {
 }
 
 fn build_world() -> World {
+    const MARGIN: Real = 0.1;
+
     let mut world = World::new();
+    world
+        .statics_mut()
+        .quick_add(new_static(new_box([0.0, -0.5], [20.0, 1.0])), MARGIN);
+    world.dynamics_mut().quick_add(
+        new_dynamic(new_capsule([0.0, 10.0], 1.0, 2.0), -1.0, 1.0, false),
+        MARGIN,
+    );
+    world.dynamics_mut().quick_add(
+        new_dynamic(new_capsule([0.5, 15.0], 1.0, 2.0), -1.5, 1.0, true),
+        MARGIN,
+    );
+    world
+        .statics_mut()
+        .quick_add(new_static(new_box([5.0, 2.5], [5.0, 5.0])), MARGIN);
 
     world
 }
@@ -138,6 +166,21 @@ impl Inputs {
             jump: is_key_pressed(KeyCode::Space),
         }
     }
+}
+
+fn new_static(coll: (Arc<dyn Shape>, Isometry<Real>)) -> RefCell<StaticObject> {
+    RefCell::new(StaticObject::new(coll.0, coll.1, MASK_ALL, false))
+}
+
+fn new_dynamic(
+    coll: (Arc<dyn Shape>, Isometry<Real>),
+    fall_speed: Real,
+    weight: Real,
+    bounce: bool,
+) -> RefCell<DynamicObject> {
+    let mut d = DynamicObject::new(coll.0, coll.1, MASK_ALL, false, weight, bounce);
+    d.velocity.y = fall_speed;
+    RefCell::new(d)
 }
 
 fn new_box(pos: V2, size: V2) -> (Arc<dyn Shape>, Isometry<Real>) {

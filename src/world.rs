@@ -9,8 +9,8 @@ pub mod iter;
 /// Handle world state update
 mod update;
 
-/// Allow making various geometry casts
-mod cast;
+/// Allow making various geometry queries
+mod query;
 
 use crate::object::{DynamicObject, StaticObject};
 use alloc::vec::Vec;

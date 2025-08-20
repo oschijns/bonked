@@ -6,9 +6,12 @@ use parry::query::{self, ShapeCastOptions};
 
 impl World {
     pub fn update(&mut self, options: ShapeCastOptions) {
-        // Clean up the previous results
+        // Prepare the new update.
         self.on_trigger.clear();
         self.on_collision.clear();
+        for obj in self.dynamics.objects.values() {
+            obj.borrow_mut().pre_update(options.max_time_of_impact);
+        }
 
         // Broad-phase for dynamic objects against static objects.
         let leaf_pairs = self

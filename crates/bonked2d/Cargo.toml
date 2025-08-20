@@ -39,6 +39,7 @@ required-features = ["2d"]
 # Dependencies
 [dependencies]
 
+hashbrown.workspace = true
 delegate.workspace = true
 spin.workspace = true
 

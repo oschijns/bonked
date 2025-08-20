@@ -43,7 +43,7 @@ pub trait Object {
 
     /// Return true if the two objects can interact if their layer and filter match
     #[inline]
-    fn can_interact(&self, other: &Self) -> bool {
+    fn can_interact(&self, other: &dyn Object) -> bool {
         self.layer_filter().can_interact(*other.layer_filter())
     }
 

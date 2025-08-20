@@ -5,6 +5,7 @@
 use crate::object::Object;
 use core::cell::{Ref, RefCell, RefMut};
 use delegate::delegate;
+use hashbrown::hash_map::Iter;
 use parry::{
     bounding_volume::Aabb,
     math::{Point, Real},
@@ -99,6 +100,11 @@ impl<O> Set<O> {
             #[inline] pub fn assert_well_formed(&self);
             #[inline] pub fn assert_well_formed_topology_only(&self);
             #[inline] pub fn assert_is_depth_first(&self);
+        }
+    }
+    delegate! {
+        to self.objects {
+            #[inline] pub fn iter(&self) -> Iter<'_, Index, RefCell<O>>;
         }
     }
 }
