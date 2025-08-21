@@ -123,12 +123,9 @@ impl World {
         {
             // found a dynamic object closer
             Some((Ident::new(idx, true), tmp_hit.into_inner()))
-        } else if let Some(idx) = tmp_st_idx {
-            // no dynamic object found, fall back to the static object that was found before
-            Some((Ident::new(idx, false), tmp_hit.into_inner()))
         } else {
-            // neither dynamic nor static object found
-            None
+            // no dynamic object found, fall back to the static one
+            tmp_st_idx.map(|idx| (Ident::new(idx, false), tmp_hit.into_inner()))
         }
     }
 

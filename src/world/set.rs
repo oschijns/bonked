@@ -115,20 +115,12 @@ where
 {
     /// Get the object for the given index
     pub fn get(&self, index: Index) -> Option<Ref<'_, O>> {
-        if let Some(o) = self.objects.get(&index) {
-            Some(o.borrow())
-        } else {
-            None
-        }
+        self.objects.get(&index).map(|o| o.borrow())
     }
 
     /// Get the object for the given index
     pub fn get_mut(&mut self, index: Index) -> Option<RefMut<'_, O>> {
-        if let Some(o) = self.objects.get(&index) {
-            Some(o.borrow_mut())
-        } else {
-            None
-        }
+        self.objects.get(&index).map(|o| o.borrow_mut())
     }
 
     /// Add the object in the set, but this requires to call the refit method afterwards

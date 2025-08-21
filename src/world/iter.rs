@@ -65,7 +65,7 @@ impl Iterator for TriggerIter<'_> {
         let index = self.target_index;
 
         // Keep looping until we find a relevant event
-        while let Some(e) = self.iter.next() {
+        for e in self.iter.by_ref() {
             if index == e.index1 {
                 return Some(TriggerEvent {
                     other_ident: e.ident2,
@@ -88,7 +88,7 @@ impl Iterator for CollisionIter<'_> {
         let index = self.target_index;
 
         // Keep looping until we find a relevant event
-        while let Some(e) = self.iter.next() {
+        for e in self.iter.by_ref() {
             if index == e.index1 {
                 return Some(CollisionEvent {
                     other_ident: e.ident2,
