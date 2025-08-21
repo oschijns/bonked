@@ -22,9 +22,6 @@ pub struct DynamicObject {
     /// Weight of this object, define how two objects can push against each other
     weight: Real,
 
-    /// Specify if this object will bounce off other surfaces
-    bounce: bool,
-
     /// Velocity of the object.
     /// It can be accessed directly to modify each coordinate individually.
     pub velocity: Vector<Real>,
@@ -41,12 +38,10 @@ impl DynamicObject {
         layer_filter: LayerFilter,
         is_trigger: bool,
         weight: Real,
-        bounce: bool,
     ) -> Self {
         Self {
             common: CommonObject::new(shape, isometry, layer_filter, is_trigger),
             weight,
-            bounce,
             velocity: Vector::zeros(),
             next_position: isometry.translation.vector,
         }
@@ -141,19 +136,19 @@ impl DynamicObject {
             1.0
         };
 
-        // Push back the dynamic body.
-        self.next_position -= normal * (time_of_impact * ratio);
+        // Prevent the object to pass through other objects
+        self.next_position += normal * (time_of_impact * ratio);
 
         // The dot product specify if the angle between the two vectors is accute or obtuse.
         let dot = normal.dot(&self.velocity);
         let push_back = normal * (dot * ratio);
 
         if dot > 0.0 {
-            // angle is accute => cut off from the velocity
-            self.velocity -= push_back;
-        } else if self.bounce {
-            // angle is obtuse => add to the velocity
+            // angle is accute => add to the velocity
             self.velocity += push_back;
+        } else {
+            // angle is obtuse => cut off from the velocity
+            self.velocity -= push_back;
         }
     }
 }

@@ -2,16 +2,28 @@
 
 use super::{OnContact, World};
 use crate::{NULL_VECTOR, object::Object, world::Ident};
-use parry::query::{self, ShapeCastOptions};
+use parry::{
+    math::Real,
+    query::{self, ShapeCastOptions},
+};
 
 impl World {
-    pub fn update(&mut self, options: ShapeCastOptions) {
+    pub fn start(&mut self) {
+        self.statics.bvh.refit(&mut self.workspace);
+    }
+
+    pub fn update(&mut self, options: ShapeCastOptions, change_detection_margin: Real) {
         // Prepare the new update.
         self.on_trigger.clear();
         self.on_collision.clear();
-        for obj in self.dynamics.objects.values() {
-            obj.borrow_mut().pre_update(options.max_time_of_impact);
+        for (&idx, obj) in self.dynamics.objects.iter() {
+            let mut obj = obj.borrow_mut();
+            obj.pre_update(options.max_time_of_impact);
+            self.dynamics
+                .bvh
+                .insert_or_update_partially(obj.aabb(), idx, change_detection_margin);
         }
+        self.dynamics.bvh.refit(&mut self.workspace);
 
         // Broad-phase for dynamic objects against static objects.
         let leaf_pairs = self

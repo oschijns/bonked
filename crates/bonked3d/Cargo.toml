@@ -10,13 +10,13 @@ readme.workspace = true
 
 # Compile Features
 [features]
-default = ["3d", "parry-f32", "mask-u32"] #, "std"]
+default = ["3d", "parry-f32", "mask-u32", "std"]
 3d = []
 mask-u32 = []
 mask-u64 = []
 
 # enable support for the standard library
-std = ["parry3d?/std", "parry3d-f64?/std", "spin/std"]
+std = ["parry3d?/std", "parry3d-f64?/std"]
 
 # enable support for alloc
 alloc = ["parry3d?/alloc", "parry3d-f64?/alloc"]
@@ -36,13 +36,11 @@ name = "bonked3d"
 #path = "../../src/lib.rs"
 required-features = ["3d"]
 
-
 # Dependencies
 [dependencies]
 
 hashbrown.workspace = true
 delegate.workspace = true
-spin.workspace = true
 
 # Collision Detection
 parry3d = { version = "0.23", features = [

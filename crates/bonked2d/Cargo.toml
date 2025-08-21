@@ -10,13 +10,13 @@ readme.workspace = true
 
 # Compile Features
 [features]
-default = ["2d", "parry-f32", "mask-u32"] #, "std"]
+default = ["2d", "parry-f32", "mask-u32", "std"]
 2d = []
 mask-u32 = []
 mask-u64 = []
 
 # enable support for the standard library
-std = ["parry2d?/std", "parry2d-f64?/std", "spin/std"]
+std = ["parry2d?/std", "parry2d-f64?/std"]
 
 # enable support for alloc
 alloc = ["parry2d?/alloc", "parry2d-f64?/alloc"]
@@ -41,7 +41,6 @@ required-features = ["2d"]
 
 hashbrown.workspace = true
 delegate.workspace = true
-spin.workspace = true
 
 # Collision Detection
 parry2d = { version = "0.23", features = [

@@ -36,12 +36,15 @@ async fn main() {
         });
 
         const EPSILON: Real = 0.0001;
-        world.update(ShapeCastOptions {
-            max_time_of_impact: delta,
-            target_distance: EPSILON,
-            stop_at_penetration: true,
-            compute_impact_geometry_on_penetration: false,
-        });
+        world.update(
+            ShapeCastOptions {
+                max_time_of_impact: delta,
+                target_distance: EPSILON,
+                stop_at_penetration: true,
+                compute_impact_geometry_on_penetration: false,
+            },
+            EPSILON,
+        );
 
         fn draw(obj: Ref<'_, dyn Object>, color: Color) {
             let shape = AShape::new(obj.shape());
@@ -124,16 +127,17 @@ fn build_world() -> World {
         .statics_mut()
         .quick_add(new_static(new_box([0.0, -0.5], [20.0, 1.0])), MARGIN);
     world.dynamics_mut().quick_add(
-        new_dynamic(new_capsule([0.0, 10.0], 1.0, 2.0), -1.0, 1.0, false),
+        new_dynamic(new_capsule([0.0, 10.0], 1.0, 2.0), -1.0, 1.0),
         MARGIN,
     );
     world.dynamics_mut().quick_add(
-        new_dynamic(new_capsule([0.5, 15.0], 1.0, 2.0), -1.5, 1.0, true),
+        new_dynamic(new_capsule([0.5, 15.0], 1.0, 2.0), -1.5, 1.0),
         MARGIN,
     );
     world
         .statics_mut()
         .quick_add(new_static(new_box([5.0, 2.5], [5.0, 5.0])), MARGIN);
+    world.start();
 
     world
 }
@@ -176,9 +180,8 @@ fn new_dynamic(
     coll: (Arc<dyn Shape>, Isometry<Real>),
     fall_speed: Real,
     weight: Real,
-    bounce: bool,
 ) -> RefCell<DynamicObject> {
-    let mut d = DynamicObject::new(coll.0, coll.1, MASK_ALL, false, weight, bounce);
+    let mut d = DynamicObject::new(coll.0, coll.1, MASK_ALL, false, weight);
     d.velocity.y = fall_speed;
     RefCell::new(d)
 }

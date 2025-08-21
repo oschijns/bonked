@@ -18,8 +18,6 @@ hashbrown = "0.15"
 # Delegate methods from internal fields
 delegate = "0.13"
 
-# Mutable access to shared references
-spin = "0.10"
 
 [patch.crates-io]
 bonked2d = { path = "crates/bonked2d" }
