@@ -1,0 +1,36 @@
+[package]
+name = "bonked3d_level"
+description = "Simple 3D collision engine"
+authors.workspace = true
+repository.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+
+
+# Compile Features
+[features]
+default = ["std"]
+
+
+# enable support for the standard library
+std = ["bincode/std"]
+
+# enable support for alloc
+alloc = ["bincode/alloc"]
+
+
+[dependencies]
+
+# binary serialization
+bincode = { version = "2.0", features = ["derive"], default-features = false }
+
+# bitmask of vertex data
+bitfield = "0.19"
+
+# numeric traits
+num-traits = "0.2"
+
+# type size check
+unty = "0.0"
