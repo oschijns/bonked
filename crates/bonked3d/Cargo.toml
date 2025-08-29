@@ -18,9 +18,6 @@ mask-u64 = []
 # enable support for the standard library
 std = ["parry3d?/std", "parry3d-f64?/std"]
 
-# enable support for alloc
-alloc = ["parry3d?/alloc", "parry3d-f64?/alloc"]
-
 # enable support for Single Instruction Multiple Data
 simd = ["parry3d?/simd-stable", "parry3d-f64?/simd-stable"]
 

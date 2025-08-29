@@ -1,6 +1,7 @@
 //! Encoding and decoding strategy for the mesh type
 
-use crate::mesh::{Index, List, Mask, Mesh, Real, Vector};
+use crate::level::{Index, LevelPart, List, Mask, Real, Vector};
+use alloc::vec::Vec;
 use bincode::{
     Decode, Encode,
     de::Decoder,
@@ -9,7 +10,7 @@ use bincode::{
 };
 use num_traits::ConstZero;
 
-impl Encode for Mesh {
+impl Encode for LevelPart {
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
         // check the number of vertices do not exceed the supported limit
         let count = self.positions.0.len();
@@ -63,7 +64,7 @@ impl Encode for Mesh {
     }
 }
 
-impl<Ctx> Decode<Ctx> for Mesh {
+impl<Ctx> Decode<Ctx> for LevelPart {
     fn decode<D: Decoder<Context = Ctx>>(decoder: &mut D) -> Result<Self, DecodeError> {
         let mask = Mask(Decode::decode(decoder)?);
 
