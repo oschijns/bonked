@@ -3,14 +3,41 @@
 //! we have to extract the vertices used by each individual hull and reassign
 //! a new index for each vertex.
 
-use crate::level::{Index, Real, ToParryPoint, Vector};
+use crate::level::{Index, LevelPart, Real, ToParryPoint, Vector};
+use alloc::vec::Vec;
 use core::cmp::min;
-use parry::shape::ConvexPolyhedron;
+use parry::{
+    math::Isometry,
+    shape::{Compound, ConvexPolyhedron, SharedShape},
+};
+
+impl LevelPart {
+    /// Use the provided convex hulls to build the physical level geometry
+    pub fn build_collider(&self) -> Compound {
+        // prepare data to generate the convex hulls
+        let mut reindexer = ReIndexer::new(&self.positions.0);
+        let mut shapes = Vec::with_capacity(self.hull_indices.0.len());
+
+        // rebuild each convex hull from raw data
+        for hull in &self.hull_indices.0 {
+            if let Some(convex) = reindexer.make_convex_hull(&hull.0) {
+                shapes.push((Isometry::identity(), SharedShape::new(convex)));
+            } else {
+                debug_assert!(
+                    false,
+                    "Convex hull at index {} could not be generated.",
+                    shapes.len()
+                );
+            }
+        }
+        Compound::new(shapes)
+    }
+}
 
 /// Store data for generating convex polyhedrons
 struct ReIndexer<'v> {
     /// The initial vertex buffer
-    points: &'v [Vector<Real, 3>],
+    vertices: &'v [Vector<Real, 3>],
 
     /// Temporary buffer for storing indexes re-assignment
     indexes_buffer: Vec<u32>,
@@ -18,13 +45,15 @@ struct ReIndexer<'v> {
 
 impl<'v> ReIndexer<'v> {
     /// Allocate an index buffer for the provided set of points
-    fn new(points: &'v [Vector<Real, 3>]) -> Self {
+    fn new(vertices: &'v [Vector<Real, 3>]) -> Self {
+        let count = vertices.len();
+
         // allocate the indexes buffer and fill it with an invalid index
-        let mut indexes_buffer = Vec::with_capacity(points.len());
-        indexes_buffer.resize(points.len(), u32::MAX);
+        let mut indexes_buffer = Vec::with_capacity(count);
+        indexes_buffer.resize(count, u32::MAX);
 
         Self {
-            points,
+            vertices,
             indexes_buffer,
         }
     }
@@ -36,7 +65,7 @@ impl<'v> ReIndexer<'v> {
 
         // allocate a buffer to store the points, necessarly capped
         // by the vertex buffer or the number of indices in the hull
-        let count = min(self.points.len(), hull_indices.len() * 3);
+        let count = min(self.vertices.len(), hull_indices.len() * 3);
         let mut points = Vec::with_capacity(count);
         let mut indices = Vec::with_capacity(hull_indices.len());
 
@@ -50,8 +79,8 @@ impl<'v> ReIndexer<'v> {
                 if new_idx == u32::MAX {
                     // no index assigned yet, create a new one
                     new_tri[i] = points.len() as u32;
-                    let point = &self.points[idx as usize];
-                    points.push(point.to_parry());
+                    let vertex = &self.vertices[idx as usize];
+                    points.push(vertex.to_parry());
                 } else {
                     new_tri[i] = new_idx;
                 }
@@ -63,7 +92,7 @@ impl<'v> ReIndexer<'v> {
                     new_tri[$i] != u32::MAX
                 };
             }
-            assert!(
+            debug_assert!(
                 check![0] && check![1] && check![2],
                 "Some vertices of the triangle [{}, {}, {}] could not be identified",
                 new_tri[0],
@@ -75,6 +104,7 @@ impl<'v> ReIndexer<'v> {
         }
 
         // Build the convex polyhedron
+        points.shrink_to_fit();
         ConvexPolyhedron::from_convex_mesh(points, &indices)
     }
 }

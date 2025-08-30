@@ -171,8 +171,8 @@ where
     #[inline]
     fn decode<D: Decoder<Context = Ctx>>(decoder: &mut D) -> Result<Self, DecodeError> {
         let mut a = [N::ZERO; DIM];
-        for i in 0..DIM {
-            a[i] = Decode::decode(decoder)?;
+        for i in a.iter_mut().take(DIM) {
+            *i = Decode::decode(decoder)?;
         }
         Ok(Self(a))
     }
