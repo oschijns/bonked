@@ -1,6 +1,6 @@
 //! Encoding and decoding strategy for the mesh type
 
-use crate::level::{Index, LevelPart, List, Mask, Real, Vector};
+use crate::level::{Index, LevelPart, List, Real, Vector};
 use alloc::vec::Vec;
 use bincode::{
     Decode, Encode,
@@ -9,6 +9,21 @@ use bincode::{
     error::{DecodeError, EncodeError},
 };
 use num_traits::ConstZero;
+
+bitfield::bitfield! {
+    /// Specify if vertices have some extra data (normal, color, UV)
+    struct Mask(u8);
+    impl Debug;
+
+    /// Normals are defined
+    use_normals, set_normals_use: 0;
+
+    /// Colors are defined
+    use_colors, set_colors_use: 1;
+
+    /// UV coordinates are defined
+    use_uvs, set_uvs_use: 2;
+}
 
 impl Encode for LevelPart {
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {

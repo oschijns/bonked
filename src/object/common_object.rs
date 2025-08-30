@@ -1,19 +1,17 @@
 //! Data encountered in all objects
 
-use crate::mask::Mask;
-
 use super::{LayerFilter, Object};
-use alloc::sync::Arc;
+use crate::mask::Mask;
 use parry::{
     bounding_volume::Aabb,
     math::{Isometry, Real},
-    shape::Shape,
+    shape::{Shape, SharedShape},
 };
 
 /// Common data shared between static and dynamic bodies
 pub(crate) struct CommonObject {
     /// Collision shape used by this zone
-    pub(crate) shape: Arc<dyn Shape>,
+    pub(crate) shape: SharedShape,
 
     /// Isometry of this body
     pub(crate) isometry: Isometry<Real>,
@@ -29,7 +27,7 @@ impl CommonObject {
     /// Create a new common data instance
     #[inline]
     pub fn new(
-        shape: Arc<dyn Shape>,
+        shape: SharedShape,
         isometry: Isometry<Real>,
         layer_filter: LayerFilter,
         is_trigger: bool,

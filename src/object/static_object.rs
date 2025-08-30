@@ -5,12 +5,11 @@ use crate::{
     mask::{LayerFilter, Mask},
     object::common_object::CommonObject,
 };
-use alloc::sync::Arc;
 use delegate::delegate;
 use parry::{
     bounding_volume::Aabb,
     math::{Isometry, Real},
-    shape::Shape,
+    shape::{Shape, SharedShape},
 };
 
 /// Static objects cannot move over time
@@ -23,7 +22,7 @@ impl StaticObject {
     /// Build a new static body
     #[inline]
     pub fn new(
-        shape: Arc<dyn Shape>,
+        shape: SharedShape,
         isometry: Isometry<Real>,
         layer_filter: LayerFilter,
         is_trigger: bool,

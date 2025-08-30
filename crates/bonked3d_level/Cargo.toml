@@ -14,7 +14,7 @@ readme.workspace = true
 default = ["parry-f32", "std"]
 
 # enable support for the standard library
-std = ["bincode/std", "parry3d?/std", "parry3d-f64?/std"]
+std = ["bincode/std", "thiserror/std", "parry3d?/std", "parry3d-f64?/std"]
 
 # Specify which parry variant should be used as a dependency
 parry-f32 = ["dep:parry3d"]
@@ -44,6 +44,9 @@ bitfield = "0.19"
 
 # numeric traits
 num-traits = "0.2"
+
+# error reporting
+thiserror = { version = "2.0", default-features = false }
 
 # type size check
 #unty = "0.0"

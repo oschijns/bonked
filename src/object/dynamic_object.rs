@@ -5,13 +5,12 @@ use crate::{
     mask::{LayerFilter, Mask},
     object::common_object::CommonObject,
 };
-use alloc::sync::Arc;
 use delegate::delegate;
 use parry::{
     bounding_volume::Aabb,
     math::{Isometry, Real, Translation, Vector},
     na::Unit,
-    shape::Shape,
+    shape::{Shape, SharedShape},
 };
 
 /// Dynamic objects can move over time
@@ -33,7 +32,7 @@ pub struct DynamicObject {
 impl DynamicObject {
     /// Create a new dynamic object
     pub fn new(
-        shape: Arc<dyn Shape>,
+        shape: SharedShape,
         isometry: Isometry<Real>,
         layer_filter: LayerFilter,
         is_trigger: bool,

@@ -3,9 +3,6 @@
 /// Level data layout
 pub mod level;
 
-/// Convert mesh into a level component
-pub mod mesh;
-
 /// Use alloc crate for no_std support
 extern crate alloc;
 

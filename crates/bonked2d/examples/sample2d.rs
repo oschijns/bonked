@@ -7,7 +7,7 @@ use macroquad::{miniquad::window, prelude::*};
 use parry2d::{
     math::{Isometry, Point, Real, Vector},
     query::ShapeCastOptions,
-    shape::{Ball, Capsule, Cuboid, Shape},
+    shape::{Ball, Capsule, Cuboid, Shape, SharedShape},
 };
 use std::{
     cell::{Ref, RefCell},
@@ -172,12 +172,12 @@ impl Inputs {
     }
 }
 
-fn new_static(coll: (Arc<dyn Shape>, Isometry<Real>)) -> RefCell<StaticObject> {
+fn new_static(coll: (SharedShape, Isometry<Real>)) -> RefCell<StaticObject> {
     RefCell::new(StaticObject::new(coll.0, coll.1, MASK_ALL, false))
 }
 
 fn new_dynamic(
-    coll: (Arc<dyn Shape>, Isometry<Real>),
+    coll: (SharedShape, Isometry<Real>),
     fall_speed: Real,
     weight: Real,
 ) -> RefCell<DynamicObject> {
@@ -186,24 +186,21 @@ fn new_dynamic(
     RefCell::new(d)
 }
 
-fn new_box(pos: V2, size: V2) -> (Arc<dyn Shape>, Isometry<Real>) {
-    let shape = Arc::new(Cuboid::new(to_nalgebra(size) * 0.5));
+fn new_box(pos: V2, size: V2) -> (SharedShape, Isometry<Real>) {
+    let shape = SharedShape::cuboid(size[0] * 0.5, size[1] * 0.5);
     let pos = Isometry::new(to_nalgebra(pos), 0.0);
     (shape, pos)
 }
 
-fn new_ball(pos: V2, diameter: f32) -> (Arc<dyn Shape>, Isometry<Real>) {
-    let shape = Arc::new(Ball::new(diameter * 0.5));
+fn new_ball(pos: V2, diameter: f32) -> (SharedShape, Isometry<Real>) {
+    let shape = SharedShape::ball(diameter * 0.5);
     let pos = Isometry::new(to_nalgebra(pos), 0.0);
     (shape, pos)
 }
 
-fn new_capsule(pos: V2, diameter: f32, height: f32) -> (Arc<dyn Shape>, Isometry<Real>) {
+fn new_capsule(pos: V2, diameter: f32, height: f32) -> (SharedShape, Isometry<Real>) {
     let radius = diameter * 0.5;
-    let half = (height * 0.5 - radius).max(0.0);
-    let a = Point::new(0.0, half);
-    let b = Point::new(0.0, -half * 0.5);
-    let shape = Arc::new(Capsule::new(a, b, radius));
+    let shape = SharedShape::capsule_y(height * 0.5 - radius, radius);
     let pos = Isometry::new(to_nalgebra(pos), 0.0);
     (shape, pos)
 }

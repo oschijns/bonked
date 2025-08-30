@@ -1,9 +1,19 @@
 //! Mesh data to store onto file or load from a file
 
-use alloc::vec::Vec;
+/// Common operations on some basic types
+mod base;
+
+/// Handle mesh decomposition
+mod decomp;
 
 /// Encoding and decoding implementation for the mesh
 mod encoding;
+
+/// Reconstruct the convex hulls from the level part
+mod reconstruct;
+
+use alloc::vec::Vec;
+use parry::math::{self, Point};
 
 /// Mesh that can be used for rendering and generating colliders
 pub struct LevelPart {
@@ -39,17 +49,25 @@ pub struct Vector<N, const DIM: usize>(pub [N; DIM]);
 /// List of elements (allow encoding its size using Index type)
 pub struct List<T>(pub Vec<T>);
 
-bitfield::bitfield! {
-    /// Specify if vertices have some extra data (normal, color, UV)
-    pub struct Mask(u8);
-    impl Debug;
+/// Generic mesh data to convert
+pub struct GenericMesh<'m, V, I>
+where
+    V: ToParryPoint,
+    I: ToParryIndex,
+{
+    /// Vertices data to serialize
+    vertices: &'m [V],
 
-    /// Normals are defined
-    pub use_normals, set_normals_use: 0;
+    /// Indices to compose the triangles
+    indices: &'m [I],
+}
 
-    /// Colors are defined
-    pub use_colors, set_colors_use: 1;
+pub trait ToParryPoint {
+    /// convert to be used in VHACD
+    fn to_parry(&self) -> Point<math::Real>;
+}
 
-    /// UV coordinates are defined
-    pub use_uvs, set_uvs_use: 2;
+pub trait ToParryIndex {
+    /// convert to be used in VHACD
+    fn to_parry(&self) -> [u32; 3];
 }

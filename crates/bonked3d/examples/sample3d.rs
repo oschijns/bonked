@@ -5,14 +5,11 @@ use bonked3d::{
 };
 use macroquad::prelude::*;
 use parry3d::{
-    math::{Isometry, Point, Real, Vector},
+    math::{Isometry, Real, Vector},
     query::ShapeCastOptions,
-    shape::{Ball, Capsule, Cuboid, Cylinder, Shape},
+    shape::{Ball, Capsule, Cuboid, Cylinder, Shape, SharedShape},
 };
-use std::{
-    cell::{Ref, RefCell},
-    sync::Arc,
-};
+use std::cell::{Ref, RefCell};
 
 #[macroquad::main("3D")]
 async fn main() {
@@ -208,12 +205,12 @@ impl Inputs {
     }
 }
 
-fn new_static(coll: (Arc<dyn Shape>, Isometry<Real>)) -> RefCell<StaticObject> {
+fn new_static(coll: (SharedShape, Isometry<Real>)) -> RefCell<StaticObject> {
     RefCell::new(StaticObject::new(coll.0, coll.1, MASK_ALL, false))
 }
 
 fn new_dynamic(
-    coll: (Arc<dyn Shape>, Isometry<Real>),
+    coll: (SharedShape, Isometry<Real>),
     fall_speed: Real,
     weight: Real,
 ) -> RefCell<DynamicObject> {
@@ -222,30 +219,27 @@ fn new_dynamic(
     RefCell::new(d)
 }
 
-fn new_box(pos: V3, size: V3) -> (Arc<dyn Shape>, Isometry<Real>) {
-    let shape = Arc::new(Cuboid::new(to_nalgebra(size) * 0.5));
+fn new_box(pos: V3, size: V3) -> (SharedShape, Isometry<Real>) {
+    let shape = SharedShape::cuboid(size[0] * 0.5, size[1] * 0.5, size[2] * 0.5);
     let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
     (shape, pos)
 }
 
-fn new_ball(pos: V3, diameter: f32) -> (Arc<dyn Shape>, Isometry<Real>) {
-    let shape = Arc::new(Ball::new(diameter * 0.5));
+fn new_ball(pos: V3, diameter: f32) -> (SharedShape, Isometry<Real>) {
+    let shape = SharedShape::ball(diameter * 0.5);
     let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
     (shape, pos)
 }
 
-fn new_capsule(pos: V3, diameter: f32, height: f32) -> (Arc<dyn Shape>, Isometry<Real>) {
+fn new_capsule(pos: V3, diameter: f32, height: f32) -> (SharedShape, Isometry<Real>) {
     let radius = diameter * 0.5;
-    let half = (height * 0.5 - radius).max(0.0);
-    let a = Point::new(0.0, half, 0.0);
-    let b = Point::new(0.0, -half * 0.5, 0.0);
-    let shape = Arc::new(Capsule::new(a, b, radius));
+    let shape = SharedShape::capsule_y(height * 0.5 - radius, radius);
     let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
     (shape, pos)
 }
 
-fn new_cylinder(pos: V3, diameter: f32, height: f32) -> (Arc<dyn Shape>, Isometry<Real>) {
-    let shape = Arc::new(Cylinder::new(height * 0.5, diameter * 0.5));
+fn new_cylinder(pos: V3, diameter: f32, height: f32) -> (SharedShape, Isometry<Real>) {
+    let shape = SharedShape::cylinder(height * 0.5, diameter * 0.5);
     let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
     (shape, pos)
 }
