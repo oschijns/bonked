@@ -1,0 +1,21 @@
+[package]
+name = "bonked3d_level_maker"
+description = "Generate 3D level format from common 3D file formats"
+authors.workspace = true
+repository.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+
+[dependencies]
+
+thiserror = "2.0"
+clap = { version = "4.5", features = ["derive"] }
+
+# Data format to serialize into
+bonked3d_level = { path = "../bonked3d_level" }
+
+# File formats to handle
+obj-rs = "0.7"
+gltf = "1.4"

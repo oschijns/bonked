@@ -1,6 +1,6 @@
 [package]
 name = "bonked3d_level"
-description = "Simple 3D collision engine"
+description = "3D level format to use with Bonked3D"
 authors.workspace = true
 repository.workspace = true
 version.workspace = true

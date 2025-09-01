@@ -4,7 +4,7 @@
 mod base;
 
 /// Handle mesh decomposition
-mod decomp;
+pub mod decomp;
 
 /// Encoding and decoding implementation for the mesh
 mod encoding;

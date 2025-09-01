@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/bonked2d", "crates/bonked3d", "crates/bonked3d_level"]
+members = [
+    "crates/bonked2d",
+    "crates/bonked3d",
+    "crates/bonked3d_level",
+    "crates/bonked3d_level_maker",
+]
 resolver = "2"
 
 [workspace.package]
