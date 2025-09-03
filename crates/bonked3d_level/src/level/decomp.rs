@@ -1,9 +1,6 @@
 //! Handle convex decomposition for an arbitrary mesh
 
-use crate::level::{
-    GenericMesh, Index, LevelPart, List, ToLevelIndex, ToLevelVertex, ToParryIndex, ToParryPoint,
-    Vector,
-};
+use crate::level::{Index, List, Mesh, Vector, generic_mesh::GenericMesh};
 use alloc::vec::Vec;
 use parry::{
     math::{self, Point},
@@ -26,13 +23,9 @@ pub enum ConvertError {
     UnknownPoint(Point<math::Real>),
 }
 
-impl<'m, V, I> GenericMesh<'m, V, I>
-where
-    V: ToParryPoint + ToLevelVertex,
-    I: ToParryIndex + ToLevelIndex,
-{
+impl GenericMesh {
     /// Convert the mesh into a level part
-    pub fn to_level_part(&self) -> Result<LevelPart, ConvertError> {
+    pub fn to_serial_mesh(&self) -> Result<Mesh, ConvertError> {
         // start with convex decomposition as it is the step most likely to fail
         let hull_indices = self.decompose()?;
 
@@ -44,15 +37,15 @@ where
         let mut uvs = Vec::with_capacity(count);
 
         // fill the buffers with data
-        for vertex in self.vertices {
-            positions.push(vertex.get_position());
-            if let Some(normal) = vertex.get_normal() {
+        for vertex in &self.vertices {
+            positions.push(vertex.position);
+            if let Some(normal) = vertex.normal {
                 normals.push(normal);
             }
-            if let Some(color) = vertex.get_color() {
+            if let Some(color) = vertex.color {
                 colors.push(color);
             }
-            if let Some(uv) = vertex.get_uv() {
+            if let Some(uv) = vertex.uv {
                 uvs.push(uv);
             }
         }
@@ -76,11 +69,11 @@ where
 
         // compose the main list of indices
         let mut indices = Vec::with_capacity(self.indices.len());
-        for index in self.indices {
-            indices.push(index.get_index());
+        for index in &self.indices {
+            indices.push(*index);
         }
 
-        Ok(LevelPart {
+        Ok(Mesh {
             positions: List(positions),
             normals,
             colors,
@@ -91,11 +84,7 @@ where
     }
 }
 
-impl<'m, V, I> GenericMesh<'m, V, I>
-where
-    V: ToParryPoint,
-    I: ToParryIndex,
-{
+impl GenericMesh {
     /// Perform a convex decomposition of the mesh
     fn decompose(&self) -> Result<List<List<Vector<Index, 3>>>, ConvertError> {
         let params = VHACDParameters::default();
@@ -104,12 +93,12 @@ where
         let points = self
             .vertices
             .iter()
-            .map(|v| v.to_parry())
+            .map(|v| v.position.parry_point())
             .collect::<Vec<_>>();
         let indices = self
             .indices
             .iter()
-            .map(|i| i.to_parry())
+            .map(|i| i.parry_index())
             .collect::<Vec<_>>();
 
         // compute the convex decomposition

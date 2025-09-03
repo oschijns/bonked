@@ -3,6 +3,9 @@
 /// Convert wavefront obj format to bonked format
 mod convert_obj;
 
+/// Convert GLTF into bonked format
+mod convert_gltf;
+
 use ::gltf::{Glb, Gltf};
 use ::obj::{Obj, load_obj};
 use clap::{Parser, ValueEnum};
@@ -60,7 +63,7 @@ fn main() {
                 }
             },
             "glb" => match open_glb(&args.input) {
-                Ok(gltf) => {}
+                Ok(glb) => {}
                 Err(err) => {
                     eprintln!("Failed to load .glb file: {}", err);
                     process::exit(12)

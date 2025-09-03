@@ -3,7 +3,7 @@
 //! we have to extract the vertices used by each individual hull and reassign
 //! a new index for each vertex.
 
-use crate::level::{Index, LevelPart, Real, ToParryPoint, Vector};
+use crate::level::{Index, Mesh, Real, Vector};
 use alloc::vec::Vec;
 use core::cmp::min;
 use parry::{
@@ -11,7 +11,7 @@ use parry::{
     shape::{Compound, ConvexPolyhedron, SharedShape},
 };
 
-impl LevelPart {
+impl Mesh {
     /// Use the provided convex hulls to build the physical level geometry
     pub fn build_collider(&self) -> Compound {
         // prepare data to generate the convex hulls
@@ -79,8 +79,7 @@ impl<'v> ReIndexer<'v> {
                 if new_idx == u32::MAX {
                     // no index assigned yet, create a new one
                     new_tri[i] = points.len() as u32;
-                    let vertex = &self.vertices[idx as usize];
-                    points.push(vertex.to_parry());
+                    points.push(self.vertices[idx as usize].parry_point());
                 } else {
                     new_tri[i] = new_idx;
                 }
