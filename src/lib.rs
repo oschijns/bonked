@@ -46,9 +46,3 @@ use parry::math::{Real, Vector};
 pub fn is_null(v: &Vector, epsilon: Real) -> bool {
     v.length_squared() <= epsilon * epsilon
 }
-
-#[cfg(feature = "2d")]
-pub const NULL_VECTOR: Vector = Vector::new(0.0, 0.0);
-
-#[cfg(feature = "3d")]
-pub const NULL_VECTOR: Vector = Vector::new(0.0, 0.0, 0.0);

@@ -5,11 +5,14 @@ use bonked3d::{
 };
 use macroquad::prelude::*;
 use parry3d::{
-    math::{Isometry, Real, Vector},
+    math::{Pose, Real, Rotation, Vector},
     query::ShapeCastOptions,
     shape::{Ball, Capsule, Cuboid, Cylinder, Shape, SharedShape},
 };
-use std::cell::{Ref, RefCell};
+use std::{
+    cell::{Ref, RefCell},
+    f32::consts::PI,
+};
 
 #[macroquad::main("3D")]
 async fn main() {
@@ -48,8 +51,7 @@ async fn main() {
 
         fn draw(obj: Ref<'_, dyn Object>, color: Color) {
             let shape = AShape::new(obj.shape());
-            let pos = to_glam(obj.isometry().translation.vector);
-            shape.draw(pos, color);
+            shape.draw(obj.isometry(), color);
         }
 
         for (_idx, obj) in world.statics().iter() {
@@ -67,6 +69,21 @@ async fn main() {
 
         next_frame().await
     }
+}
+
+macro_rules! pose {
+    () => {
+        Pose::identity()
+    };
+    ($x:literal, $y:literal, $z:literal) => {
+        Pose::from_translation(Vector::new($x as Real, $y as Real, $z as Real))
+    };
+    ([$x:literal, $y:literal, $z:literal], [$axis:ident, $ang:literal]) => {
+        Pose::from_parts(
+            Vector::new($x as Real, $y as Real, $z as Real),
+            Rotation::from_axis_angle(Vector::$axis, $ang as Real * PI / 180.0),
+        )
+    };
 }
 
 enum AShape<'s> {
@@ -101,38 +118,38 @@ impl<'s> AShape<'s> {
         }
     }
 
-    fn draw(&'s self, pos: Vec3, color: Color) {
+    fn draw(&'s self, pose: &Pose, color: Color) {
         match self {
             Self::Box(shape) => {
-                let size = to_glam(shape.half_extents) * 2.0;
-                draw_cube_wires(pos, size, color);
+                // TODO: missing rotation
+                let t = to_macroquad(pose.translation);
+                let size = to_macroquad(shape.half_extents * 2.0);
+                draw_cube_wires(t, size, color);
             }
             Self::Ball(shape) => {
-                draw_sphere_wires(pos, shape.radius, None, color);
+                let t = to_macroquad(pose.translation);
+                draw_sphere_wires(t, shape.radius, None, color);
             }
             Self::Cylinder(shape) => {
-                draw_cylinder_wires(
-                    pos,
+                // TODO: missing rotation
+                draw_cylinder_ex(
+                    to_macroquad(pose.translation),
                     shape.radius,
                     shape.radius,
                     shape.half_height * 2.0,
                     None,
                     color,
+                    DrawCylinderParams {
+                        sides: 16,
+                        draw_mode: DrawMode::Lines,
+                    },
                 );
             }
             Self::Capsule(shape) => {
-                draw_sphere_wires(
-                    pos + to_glam(shape.segment.a.coords),
-                    shape.radius,
-                    None,
-                    color,
-                );
-                draw_sphere_wires(
-                    pos + to_glam(shape.segment.b.coords),
-                    shape.radius,
-                    None,
-                    color,
-                );
+                let t1 = to_macroquad(pose * shape.segment.a);
+                let t2 = to_macroquad(pose * shape.segment.b);
+                draw_sphere_wires(t1, shape.radius, None, color);
+                draw_sphere_wires(t2, shape.radius, None, color);
             }
             _ => {}
         }
@@ -144,19 +161,24 @@ fn build_world() -> World {
 
     let mut world = World::new();
     world.statics_mut().quick_add(
-        new_static(new_box([0.0, -0.5, 0.0], [20.0, 1.0, 20.0])),
+        new_static(new_box(Vector::new(20.0, 1.0, 20.0)), pose!(0, -0.5, 0)),
         MARGIN,
     );
     world.dynamics_mut().quick_add(
-        new_dynamic(new_capsule([0.0, 10.0, 0.0], 1.0, 2.0), -1.0, 1.0),
+        new_dynamic(new_capsule(1.0, 2.0), pose!([0, 10, 0], [Z, 10]), -1.0, 1.0),
         MARGIN,
     );
     world.dynamics_mut().quick_add(
-        new_dynamic(new_capsule([0.5, 15.0, 0.5], 1.0, 2.0), -1.5, 1.0),
+        new_dynamic(
+            new_capsule(1.0, 2.0),
+            pose!([0.5, 15, 0.5], [X, 10]),
+            -1.5,
+            1.0,
+        ),
         MARGIN,
     );
     world.statics_mut().quick_add(
-        new_static(new_box([4.0, 2.5, 5.0], [5.0, 5.0, 5.0])),
+        new_static(new_box(Vector::new(5.0, 5.0, 5.0)), pose!(4, 2.5, 5)),
         MARGIN,
     );
     world.start();
@@ -205,55 +227,46 @@ impl Inputs {
     }
 }
 
-fn new_static(coll: (SharedShape, Isometry<Real>)) -> RefCell<StaticObject> {
-    RefCell::new(StaticObject::new(coll.0, coll.1, MASK_ALL, false))
+#[inline]
+fn new_static(shape: SharedShape, pose: Pose) -> RefCell<StaticObject> {
+    RefCell::new(StaticObject::new(shape, pose, MASK_ALL, false))
 }
 
+#[inline]
 fn new_dynamic(
-    coll: (SharedShape, Isometry<Real>),
+    shape: SharedShape,
+    pose: Pose,
     fall_speed: Real,
     weight: Real,
 ) -> RefCell<DynamicObject> {
-    let mut d = DynamicObject::new(coll.0, coll.1, MASK_ALL, false, weight);
+    let mut d = DynamicObject::new(shape, pose, MASK_ALL, false, weight);
     d.velocity.y = fall_speed;
     RefCell::new(d)
 }
 
-fn new_box(pos: V3, size: V3) -> (SharedShape, Isometry<Real>) {
-    let shape = SharedShape::cuboid(size[0] * 0.5, size[1] * 0.5, size[2] * 0.5);
-    let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
-    (shape, pos)
+#[inline]
+fn new_box(size: Vector) -> SharedShape {
+    SharedShape::cuboid(size[0] * 0.5, size[1] * 0.5, size[2] * 0.5)
 }
 
-fn new_ball(pos: V3, diameter: f32) -> (SharedShape, Isometry<Real>) {
-    let shape = SharedShape::ball(diameter * 0.5);
-    let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
-    (shape, pos)
+#[inline]
+fn new_ball(diameter: Real) -> SharedShape {
+    SharedShape::ball(diameter * 0.5)
 }
 
-fn new_capsule(pos: V3, diameter: f32, height: f32) -> (SharedShape, Isometry<Real>) {
+#[inline]
+fn new_capsule(diameter: Real, height: Real) -> SharedShape {
     let radius = diameter * 0.5;
-    let shape = SharedShape::capsule_y(height * 0.5 - radius, radius);
-    let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
-    (shape, pos)
+    SharedShape::capsule_y(height * 0.5 - radius, radius)
 }
 
-fn new_cylinder(pos: V3, diameter: f32, height: f32) -> (SharedShape, Isometry<Real>) {
-    let shape = SharedShape::cylinder(height * 0.5, diameter * 0.5);
-    let pos = Isometry::new(to_nalgebra(pos), Vector::zeros());
-    (shape, pos)
-}
-
-type V3 = [Real; 3];
-
-/// Converts a `Vector<Real>` to a `Vec3`.
 #[inline]
-fn to_glam(v: Vector<Real>) -> Vec3 {
-    Vec3::new(v.x as f32, v.y as f32, v.z as f32)
+fn new_cylinder(diameter: Real, height: Real) -> SharedShape {
+    SharedShape::cylinder(height * 0.5, diameter * 0.5)
 }
 
-/// Converts a `[Real; 3]` to a `Vector<Real>`.
+/// Converts a parry `Vector` to a macroquad `Vec3`.
 #[inline]
-fn to_nalgebra(v: V3) -> Vector<Real> {
-    Vector::new(v[0], v[1], v[2])
+fn to_macroquad(v: Vector) -> Vec3 {
+    Vec3::new(v.x, v.y, v.z)
 }

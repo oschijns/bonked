@@ -1,9 +1,9 @@
 //! Update the state of the world every frame
 
 use super::{OnContact, World};
-use crate::{NULL_VECTOR, object::Object, world::Ident};
+use crate::{object::Object, world::Ident};
 use parry::{
-    math::Real,
+    math::{Real, Vector},
     query::{self, ShapeCastOptions},
 };
 
@@ -62,15 +62,15 @@ impl World {
                     d_obj.velocity(),
                     d_obj.shape(),
                     s_obj.isometry(),
-                    NULL_VECTOR,
+                    Vector::ZERO,
                     s_obj.shape(),
                     options,
                 )
                 .unwrap_or(None)
                 {
                     // Collision between a dynamic body and a static body.
-                    let iso = d_obj.isometry() * hit.normal2;
-                    d_obj.apply_hit(hit.time_of_impact, iso, None);
+                    let nrm = s_obj.isometry().rotation * hit.normal2;
+                    d_obj.apply_hit(hit.time_of_impact, nrm, None);
 
                     // Store the result for later use
                     self.on_collision
@@ -114,8 +114,8 @@ impl World {
                     )
                     .unwrap_or(None)
                     {
-                        let nrm1 = obj1.isometry() * hit.normal1;
-                        let nrm2 = obj2.isometry() * hit.normal2;
+                        let nrm1 = obj1.isometry().rotation * hit.normal1;
+                        let nrm2 = obj2.isometry().rotation * hit.normal2;
 
                         // Apply the collision push back to both objects
                         obj1.apply_hit(hit.time_of_impact, nrm2, Some(obj2.weight()));

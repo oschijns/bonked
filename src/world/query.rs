@@ -2,7 +2,6 @@
 //! This includes point casts, ray casts and shape casts.
 
 use crate::{
-    NULL_VECTOR,
     mask::Mask,
     object::Object,
     world::{Ident, World, set::Index},
@@ -71,7 +70,7 @@ impl World {
         // Store ray intersection extra data in a temporary variable.
         let tmp_hit = RefCell::new(RayIntersection::new(
             max_time_of_impact,
-            NULL_VECTOR,
+            Vector::ZERO,
             FeatureId::Unknown,
         ));
 

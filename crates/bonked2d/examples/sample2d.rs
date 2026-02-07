@@ -5,13 +5,13 @@ use bonked2d::{
 };
 use macroquad::{miniquad::window, prelude::*};
 use parry2d::{
-    math::{Isometry, Point, Real, Vector},
+    math::{Pose, Real, Rotation, Vector},
     query::ShapeCastOptions,
     shape::{Ball, Capsule, Cuboid, Shape, SharedShape},
 };
 use std::{
     cell::{Ref, RefCell},
-    sync::Arc,
+    f32::consts::PI,
 };
 
 #[macroquad::main("2D")]
@@ -48,8 +48,7 @@ async fn main() {
 
         fn draw(obj: Ref<'_, dyn Object>, color: Color) {
             let shape = AShape::new(obj.shape());
-            let pos = to_glam(obj.isometry().translation.vector);
-            shape.draw(pos, color);
+            shape.draw(obj.isometry(), color);
         }
 
         for (_idx, obj) in world.statics().iter() {
@@ -67,6 +66,21 @@ async fn main() {
 
         next_frame().await
     }
+}
+
+macro_rules! pose {
+    () => {
+        Pose::identity()
+    };
+    ($x:literal, $y:literal) => {
+        Pose::from_translation(Vector::new($x as Real, $y as Real))
+    };
+    ([$x:literal, $y:literal], $ang:literal) => {
+        Pose::from_parts(
+            Vector::new($x as Real, $y as Real),
+            Rotation::from_angle($ang as Real * PI / 180.0),
+        )
+    };
 }
 
 enum AShape<'s> {
@@ -96,21 +110,32 @@ impl<'s> AShape<'s> {
         }
     }
 
-    fn draw(&'s self, pos: Vec2, color: Color) {
+    fn draw(&'s self, pose: &Pose, color: Color) {
         const THICKNESS: f32 = 0.05;
         match self {
             Self::Box(shape) => {
-                let half = to_glam(shape.half_extents);
-                let start = pos - half;
-                let size = half * 2.0;
-                draw_rectangle_lines(start.x, start.y, size.x, size.y, THICKNESS, color);
+                let start = pose.translation;
+                let size = shape.half_extents * 2.0;
+                draw_rectangle_lines_ex(
+                    start.x,
+                    start.y,
+                    size.x,
+                    size.y,
+                    THICKNESS,
+                    DrawRectangleParams {
+                        offset: Vec2::new(0.5, 0.5),
+                        rotation: pose.rotation.angle(),
+                        color,
+                    },
+                );
             }
             Self::Ball(shape) => {
-                draw_circle_lines(pos.x, pos.y, shape.radius, THICKNESS, color);
+                let t = pose.translation;
+                draw_circle_lines(t.x, t.y, shape.radius, THICKNESS, color);
             }
             Self::Capsule(shape) => {
-                let a = pos + to_glam(shape.segment.a.coords);
-                let b = pos + to_glam(shape.segment.b.coords);
+                let a = pose * shape.segment.a;
+                let b = pose * shape.segment.b;
                 draw_circle_lines(a.x, a.y, shape.radius, THICKNESS, color);
                 draw_circle_lines(b.x, b.y, shape.radius, THICKNESS, color);
             }
@@ -123,20 +148,22 @@ fn build_world() -> World {
     const MARGIN: Real = 0.1;
 
     let mut world = World::new();
-    world
-        .statics_mut()
-        .quick_add(new_static(new_box([0.0, -0.5], [20.0, 1.0])), MARGIN);
-    world.dynamics_mut().quick_add(
-        new_dynamic(new_capsule([0.0, 10.0], 1.0, 2.0), -1.0, 1.0),
+    world.statics_mut().quick_add(
+        new_static(new_box(Vector::new(20.0, 1.0)), pose!(0, -0.5)),
         MARGIN,
     );
     world.dynamics_mut().quick_add(
-        new_dynamic(new_capsule([0.5, 15.0], 1.0, 2.0), -1.5, 1.0),
+        new_dynamic(new_capsule(1.0, 2.0), pose!([0, 10], 45), -1.0, 1.0),
         MARGIN,
     );
-    world
-        .statics_mut()
-        .quick_add(new_static(new_box([5.0, 2.5], [5.0, 5.0])), MARGIN);
+    world.dynamics_mut().quick_add(
+        new_dynamic(new_capsule(1.0, 2.0), pose!([0.5, 15], -45), -1.5, 1.0),
+        MARGIN,
+    );
+    world.statics_mut().quick_add(
+        new_static(new_box(Vector::new(5.0, 5.0)), pose!([5, 2.5], -10)),
+        MARGIN,
+    );
     world.start();
 
     world
@@ -172,49 +199,35 @@ impl Inputs {
     }
 }
 
-fn new_static(coll: (SharedShape, Isometry<Real>)) -> RefCell<StaticObject> {
-    RefCell::new(StaticObject::new(coll.0, coll.1, MASK_ALL, false))
+#[inline]
+fn new_static(shape: SharedShape, pose: Pose) -> RefCell<StaticObject> {
+    RefCell::new(StaticObject::new(shape, pose, MASK_ALL, false))
 }
 
+#[inline]
 fn new_dynamic(
-    coll: (SharedShape, Isometry<Real>),
+    shape: SharedShape,
+    pose: Pose,
     fall_speed: Real,
     weight: Real,
 ) -> RefCell<DynamicObject> {
-    let mut d = DynamicObject::new(coll.0, coll.1, MASK_ALL, false, weight);
+    let mut d = DynamicObject::new(shape, pose, MASK_ALL, false, weight);
     d.velocity.y = fall_speed;
     RefCell::new(d)
 }
 
-fn new_box(pos: V2, size: V2) -> (SharedShape, Isometry<Real>) {
-    let shape = SharedShape::cuboid(size[0] * 0.5, size[1] * 0.5);
-    let pos = Isometry::new(to_nalgebra(pos), 0.0);
-    (shape, pos)
+#[inline]
+fn new_box(size: Vector) -> SharedShape {
+    SharedShape::cuboid(size[0] * 0.5, size[1] * 0.5)
 }
 
-fn new_ball(pos: V2, diameter: f32) -> (SharedShape, Isometry<Real>) {
-    let shape = SharedShape::ball(diameter * 0.5);
-    let pos = Isometry::new(to_nalgebra(pos), 0.0);
-    (shape, pos)
+#[inline]
+fn new_ball(diameter: Real) -> SharedShape {
+    SharedShape::ball(diameter * 0.5)
 }
 
-fn new_capsule(pos: V2, diameter: f32, height: f32) -> (SharedShape, Isometry<Real>) {
+#[inline]
+fn new_capsule(diameter: Real, height: Real) -> SharedShape {
     let radius = diameter * 0.5;
-    let shape = SharedShape::capsule_y(height * 0.5 - radius, radius);
-    let pos = Isometry::new(to_nalgebra(pos), 0.0);
-    (shape, pos)
-}
-
-type V2 = [Real; 2];
-
-/// Converts a `Vector<Real>` to a `Vec2`.
-#[inline]
-fn to_glam(v: Vector<Real>) -> Vec2 {
-    Vec2::new(v.x as f32, v.y as f32)
-}
-
-/// Converts a `[Real; 2]` to a `Vector<Real>`.
-#[inline]
-fn to_nalgebra(v: V2) -> Vector<Real> {
-    Vector::new(v[0], v[1])
+    SharedShape::capsule_y(height * 0.5 - radius, radius)
 }
