@@ -10,7 +10,7 @@ use crate::{
 use alloc::vec::Vec;
 use core::cell::{Ref, RefCell};
 use parry::{
-    math::{Isometry, Point, Real},
+    math::{Pose, Real, Vector},
     query::{self, PointProjection, Ray, RayIntersection},
     shape::{FeatureId, Shape},
 };
@@ -21,7 +21,7 @@ impl World {
     pub fn intersect_shape(
         &self,
         shape: &dyn Shape,
-        isometry: &Isometry<Real>,
+        isometry: &Pose,
         filter: Mask,
         detect_triggers: bool,
         results: &mut Vec<Ident>,
@@ -40,19 +40,19 @@ impl World {
 
         // Check for intersections with static objects
         for idx in self.statics.intersect_aabb(&aabb) {
-            if let Some(obj) = self.statics.get(idx) {
-                if check_object(obj) {
-                    results.push(Ident::new(idx, false));
-                }
+            if let Some(obj) = self.statics.get(idx)
+                && check_object(obj)
+            {
+                results.push(Ident::new(idx, false));
             }
         }
 
         // Check for intersections with dynamic objects
         for idx in self.dynamics.intersect_aabb(&aabb) {
-            if let Some(obj) = self.dynamics.get(idx) {
-                if check_object(obj) {
-                    results.push(Ident::new(idx, true));
-                }
+            if let Some(obj) = self.dynamics.get(idx)
+                && check_object(obj)
+            {
+                results.push(Ident::new(idx, true));
             }
         }
     }
@@ -132,7 +132,7 @@ impl World {
     /// Project a point in the world and find the closest object to it.
     pub fn project_point(
         &self,
-        point: &Point<Real>,
+        point: Vector,
         mut max_distance: Real,
         filter: Mask,
         detect_triggers: bool,

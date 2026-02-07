@@ -43,12 +43,12 @@ use parry::math::{Real, Vector};
 
 /// Returns `true` if `v` is zero (up to an epsilon).
 #[inline]
-pub fn is_null(v: &Vector<Real>, epsilon: Real) -> bool {
-    v.norm_squared() <= epsilon * epsilon
+pub fn is_null(v: &Vector, epsilon: Real) -> bool {
+    v.length_squared() <= epsilon * epsilon
 }
 
 #[cfg(feature = "2d")]
-pub const NULL_VECTOR: Vector<Real> = Vector::new(0.0, 0.0);
+pub const NULL_VECTOR: Vector = Vector::new(0.0, 0.0);
 
 #[cfg(feature = "3d")]
-pub const NULL_VECTOR: Vector<Real> = Vector::new(0.0, 0.0, 0.0);
+pub const NULL_VECTOR: Vector = Vector::new(0.0, 0.0, 0.0);

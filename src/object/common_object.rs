@@ -4,7 +4,7 @@ use super::{LayerFilter, Object};
 use crate::mask::Mask;
 use parry::{
     bounding_volume::Aabb,
-    math::{Isometry, Real},
+    math::Pose,
     shape::{Shape, SharedShape},
 };
 
@@ -14,7 +14,7 @@ pub(crate) struct CommonObject {
     pub(crate) shape: SharedShape,
 
     /// Isometry of this body
-    pub(crate) isometry: Isometry<Real>,
+    pub(crate) isometry: Pose,
 
     /// Collision mask for this object
     pub(crate) layer_filter: LayerFilter,
@@ -28,7 +28,7 @@ impl CommonObject {
     #[inline]
     pub fn new(
         shape: SharedShape,
-        isometry: Isometry<Real>,
+        isometry: Pose,
         layer_filter: LayerFilter,
         is_trigger: bool,
     ) -> Self {
@@ -50,7 +50,7 @@ impl Object for CommonObject {
 
     /// Access the isometry of this shape
     #[inline]
-    fn isometry(&self) -> &Isometry<Real> {
+    fn isometry(&self) -> &Pose {
         &self.isometry
     }
 

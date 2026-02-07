@@ -40,11 +40,11 @@ hashbrown.workspace = true
 delegate.workspace = true
 
 # Collision Detection
-parry3d = { version = "0.23", features = [
+parry3d = { version = "0.26", features = [
     "required-features",
     "alloc",
 ], default-features = false, optional = true }
-parry3d-f64 = { version = "0.23", features = [
+parry3d-f64 = { version = "0.26", features = [
     "required-features",
     "alloc",
 ], default-features = false, optional = true }

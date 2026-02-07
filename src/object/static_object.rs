@@ -8,7 +8,7 @@ use crate::{
 use delegate::delegate;
 use parry::{
     bounding_volume::Aabb,
-    math::{Isometry, Real},
+    math::Pose,
     shape::{Shape, SharedShape},
 };
 
@@ -23,7 +23,7 @@ impl StaticObject {
     #[inline]
     pub fn new(
         shape: SharedShape,
-        isometry: Isometry<Real>,
+        isometry: Pose,
         layer_filter: LayerFilter,
         is_trigger: bool,
     ) -> Self {
@@ -37,7 +37,7 @@ impl Object for StaticObject {
     delegate! {
         to self.common {
             #[inline] fn shape(&self) -> &dyn Shape;
-            #[inline] fn isometry(&self) -> &Isometry<Real>;
+            #[inline] fn isometry(&self) -> &Pose;
             #[inline] fn aabb(&self) -> Aabb;
             #[inline] fn is_dynamic(&self) -> bool;
             #[inline] fn is_trigger_area(&self) -> bool;

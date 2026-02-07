@@ -12,7 +12,7 @@ mod dynamic_object;
 use crate::mask::{LayerFilter, Mask};
 use parry::{
     bounding_volume::Aabb,
-    math::{Isometry, Real, Vector},
+    math::{Pose, Real, Vector},
     query::{self, Contact, ShapeCastHit, ShapeCastOptions},
     shape::Shape,
 };
@@ -27,7 +27,7 @@ pub trait Object {
     fn shape(&self) -> &dyn Shape;
 
     /// Access the isometry of this shape
-    fn isometry(&self) -> &Isometry<Real>;
+    fn isometry(&self) -> &Pose;
 
     /// Create an Axis-Aligned Bounding Box for this body
     fn aabb(&self) -> Aabb;
@@ -55,7 +55,7 @@ pub trait Object {
 
     /// Get the velocity of the body (if it has one)
     #[inline]
-    fn velocity(&self) -> Vector<Real> {
+    fn velocity(&self) -> Vector {
         Vector::default()
     }
 
@@ -101,10 +101,10 @@ where
 {
     query::cast_shapes(
         a.isometry(),
-        &a.velocity(),
+        a.velocity(),
         a.shape(),
         b.isometry(),
-        &b.velocity(),
+        b.velocity(),
         b.shape(),
         options,
     )

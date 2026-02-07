@@ -59,10 +59,10 @@ impl World {
                     }
                 } else if let Some(hit) = query::cast_shapes(
                     d_obj.isometry(),
-                    &d_obj.velocity(),
+                    d_obj.velocity(),
                     d_obj.shape(),
                     s_obj.isometry(),
-                    &NULL_VECTOR,
+                    NULL_VECTOR,
                     s_obj.shape(),
                     options,
                 )
@@ -70,7 +70,7 @@ impl World {
                 {
                     // Collision between a dynamic body and a static body.
                     let iso = d_obj.isometry() * hit.normal2;
-                    d_obj.apply_hit(hit.time_of_impact, &iso, None);
+                    d_obj.apply_hit(hit.time_of_impact, iso, None);
 
                     // Store the result for later use
                     self.on_collision
@@ -105,10 +105,10 @@ impl World {
                         }
                     } else if let Some(hit) = query::cast_shapes(
                         obj1.isometry(),
-                        &obj1.velocity(),
+                        obj1.velocity(),
                         obj1.shape(),
                         obj2.isometry(),
-                        &obj2.velocity(),
+                        obj2.velocity(),
                         obj2.shape(),
                         options,
                     )
@@ -118,8 +118,8 @@ impl World {
                         let nrm2 = obj2.isometry() * hit.normal2;
 
                         // Apply the collision push back to both objects
-                        obj1.apply_hit(hit.time_of_impact, &nrm2, Some(obj2.weight()));
-                        obj2.apply_hit(hit.time_of_impact, &nrm1, Some(obj1.weight()));
+                        obj1.apply_hit(hit.time_of_impact, nrm2, Some(obj2.weight()));
+                        obj2.apply_hit(hit.time_of_impact, nrm1, Some(obj1.weight()));
 
                         // Store the result for later use
                         self.on_collision

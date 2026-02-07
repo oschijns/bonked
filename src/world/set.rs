@@ -5,13 +5,12 @@
 use crate::object::Object;
 use core::cell::{Ref, RefCell, RefMut};
 use delegate::delegate;
-use hashbrown::hash_map::Iter;
+use hashbrown::{HashMap, hash_map::Iter};
 use parry::{
     bounding_volume::Aabb,
-    math::{Point, Real},
+    math::{Real, Vector},
     partitioning::{Bvh, BvhWorkspace},
     query::{PointProjection, Ray},
-    utils::hashmap::HashMap,
 };
 
 /// Identifier to find an object in the set
@@ -71,7 +70,7 @@ impl<O> Set<O> {
     #[inline]
     pub fn project_point(
         &self,
-        point: &Point<Real>,
+        point: Vector,
         max_distance: Real,
         primitive_check: impl Fn(Index, Real) -> Option<PointProjection>,
     ) -> Option<(Index, (Real, PointProjection))> {
